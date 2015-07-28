@@ -28,6 +28,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.Scanner;
 /*
@@ -474,9 +476,11 @@ public class DBMenuSystem {
 		
 		// Sliding Menu Style
 		if (prefs.getString("confslidingmenu", "0").contains("0")) {
-			context.getSlidingMenu().setTouchModeAbove(SlidingMenu.TOUCHMODE_MARGIN);
+			// FIXME
+			// context.getSlidingMenu().setTouchModeAbove(SlidingMenu.TOUCHMODE_MARGIN);
 		} else {
-			context.getSlidingMenu().setTouchModeAbove(SlidingMenu.TOUCHMODE_NONE);
+			// FIXME
+			// context.getSlidingMenu().setTouchModeAbove(SlidingMenu.TOUCHMODE_NONE);
 		}
 		
 		// GESTURES
@@ -599,13 +603,16 @@ public class DBMenuSystem {
 		        context.mSurfaceView.requestFocus();
 			}
 			imm.showSoftInput(context.mSurfaceView, 0);
+			context.mSurfaceView.mKeyboardVisible = true;
 		}
 	}
 
 	static public void doHideKeyboard(DBMain context) {
 		InputMethodManager imm = (InputMethodManager)context.getSystemService(Context.INPUT_METHOD_SERVICE);
-		if (imm != null)
-			imm.hideSoftInputFromWindow(context.mSurfaceView.getWindowToken(),0);
+		if (imm != null) {
+			imm.hideSoftInputFromWindow(context.mSurfaceView.getWindowToken(), 0);
+			context.mSurfaceView.mKeyboardVisible = false;
+		}
 	}
 	
 	static public void doConfirmQuit(final DBMain context) {
@@ -639,11 +646,21 @@ public class DBMenuSystem {
 	
 	static public boolean doOptionsItemSelected(DBMain context, MenuItem item)
 	{
-		switch(item.getItemId()){
-			case R.id.menu_exit:
+		List<Integer> ids = Arrays.asList(
+				R.id.menu_exit,
+				R.id.menu_inputmethod,
+				R.id.menu_specialkeys,
+				R.id.menu_keyboard,
+				R.id.menu_joystick,
+				R.id.menu_scale,
+				R.id.menu_settings
+		);
+
+		switch(ids.indexOf(item.getItemId())){
+			case 0:
 				doConfirmQuit(context);
 			    break;
-			case R.id.menu_inputmethod:
+			case 1:
 			{
 				InputMethodManager imm = (InputMethodManager)context.getSystemService(Context.INPUT_METHOD_SERVICE);
 				if (imm != null)
@@ -651,30 +668,30 @@ public class DBMenuSystem {
 			}
 				break;
 
-			case R.id.menu_specialkeys:
+			case 2:
 				context.mSurfaceView.mContextMenu = CONTEXT_MENU_SPECIAL_KEYS;				
 				context.openContextMenu(context.mSurfaceView);
 				break;
-			case R.id.menu_keyboard:
+			case 3:
 				if (context.mSurfaceView.mKeyboardVisible)
 					doHideKeyboard(context);
 				else 
 					doShowKeyboard(context);
 				break;
-			case R.id.menu_joystick:
+			case 4:
 				if (!getBooleanPreference(context,"confjoyoverlay")) {
 					context.mHandler.sendMessage(context.mHandler.obtainMessage(DBMain.HANDLER_ADD_JOYSTICK,0,0));
 				} else {
 					context.mHandler.sendMessage(context.mHandler.obtainMessage(DBMain.HANDLER_REMOVE_JOYSTICK,0,0));
 				}
 				break;
-			case R.id.menu_scale: 
+			case 5:
 				context.mSurfaceView.mScale = !context.mSurfaceView.mScale;
 				saveBooleanPreference(context, "confscale",context.mSurfaceView.mScale);
 				context.bScaling.setChecked(context.mSurfaceView.mScale);
 				context.mSurfaceView.forceRedraw();
 				break;
-			case R.id.menu_settings:
+			case 6:
 				if (context.mPID != null) {
 					Intent i = new Intent(context, DosBoxPreferences.class);
 					Bundle b = new Bundle();

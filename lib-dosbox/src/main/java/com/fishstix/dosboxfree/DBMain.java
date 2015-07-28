@@ -23,19 +23,11 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.Buffer;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
-/*
-import com.actionbarsherlock.view.Menu;
-import com.actionbarsherlock.view.MenuItem;
-import com.actionbarsherlock.view.Window;
-*/
 import com.fishstix.dosboxfree.dosboxprefs.DosBoxPreferences;
 import com.fishstix.dosboxfree.joystick.JoystickView;
-/*
-import com.jeremyfeinstein.slidingmenu.lib.SlidingMenu;
-import com.jeremyfeinstein.slidingmenu.lib.app.SlidingActivity;
-*/
-
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
@@ -87,10 +79,10 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 	public static final int HANDLER_ADD_JOYSTICK = 20;
 	public static final int HANDLER_REMOVE_JOYSTICK = 21;
 	public static final int HANDLER_ADD_BUTTONS = 22;
-	public static final int HANDLER_REMOVE_BUTTONS = 23; 
+	public static final int HANDLER_REMOVE_BUTTONS = 23;
 	public static final int HANDLER_SEND_KEYCODE = 1011;
-	public static final int HANDLER_DISABLE_GPU = 323;    
-	    
+	public static final int HANDLER_DISABLE_GPU = 323;
+
 	public native void nativeInit(Object ctx);
 	public static native void nativeShutDown();
 	public static native void nativeSetOption(int option, int value, String value2, boolean l);
@@ -102,14 +94,14 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 	public static native boolean nativeIsARMv7(Object ctx);
 	public static native boolean nativeIsARMv15(Object ctx);
 	public static native int nativeGetCPUFamily();
-	
+
 	public DBGLSurfaceView mSurfaceView = null;
 	public DosBoxAudio mAudioDevice = null;
 	public DosBoxThread mDosBoxThread = null;
 	public SharedPreferences prefs;
 	private static DBMain mDosBoxLauncher = null;
 	public FrameLayout mFrameLayout = null;
-	
+
 	public boolean mPrefScaleFilterOn = false;
 	public boolean mPrefSoundModuleOn = true;
 	public boolean mPrefMixerHackOn = true;
@@ -123,7 +115,7 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 	public CompoundButton bKeyboard,bJoystick,bScaling,bButtons;
 	private ImageView imgGovWarning;
 	public Button bButtonA,bButtonB,bButtonC,bButtonD;
-	
+
 	// Private Views
 	public JoystickView mJoystickView = null;
 	public ButtonLayout mButtonsView = null;
@@ -133,31 +125,32 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
     }
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
-		super.onCreate(savedInstanceState);
 	    Log.i("DosBoxTurbo", "onCreate()");
 		mDosBoxLauncher = this;
 	    requestWindowFeature(Window.FEATURE_ACTION_BAR_OVERLAY);
 
+		super.onCreate(savedInstanceState);
+
 		setContentView(R.layout.main);
-		setBehindContentView(R.layout.menu_layout);
+		// FIXME
+		// setBehindContentView(R.layout.menu_layout);
 		mContext = this;
-			
 
 		mConfPath = DosBoxPreferences.getExternalDosBoxDir(mContext);
 		this.getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN);
 	    getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
 	    getWindow().addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
-		
-		PreferenceManager.setDefaultValues(this, R.xml.preferences, false);		
+
+		PreferenceManager.setDefaultValues(this, R.xml.preferences, false);
 		prefs = PreferenceManager.getDefaultSharedPreferences(this);
 
-		
+
 		// copy mt32 libs (if necessary)
 		if (!DBMenuSystem.MT32_ROM_exists(this)) {
 			getMIDIRoms();
-		} 
+		}
 		System.loadLibrary("dosbox");
-		
+
 
 		mFrameLayout = (FrameLayout)findViewById(R.id.mFrame);
 		mSurfaceView = (DBGLSurfaceView)findViewById(R.id.mSurf);
@@ -167,9 +160,9 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 		mButtonsView.setVisibility(View.GONE);
 		mButtonsView.mDBLauncher = this;
 		registerForContextMenu(mSurfaceView);
-		
+
 		getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-		
+
 		if (prefs.getBoolean("dosmanualconf", false)) {
 			File f;
 			f = new File(prefs.getString("dosmanualconf_file", DosBoxPreferences.getExternalDosBoxDir(mContext)+DosBoxPreferences.CONFIG_FILE));
@@ -179,10 +172,10 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 			if (!f.exists()) {
 				Log.i("DosBoxTurbo","Config file not found: "+f.getAbsolutePath());
 			}
-		} 
+		}
 		mSurfaceView.mGPURendering = prefs.getBoolean("confgpu", false);
-		DBMenuSystem.loadPreference(this,prefs);	
-		
+		DBMenuSystem.loadPreference(this,prefs);
+
 		initDosBox();
 		startDosBox();
 
@@ -191,7 +184,7 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
-		
+
 		// calculate joystick constants
 		ViewTreeObserver observer = mSurfaceView.getViewTreeObserver();
 		observer.addOnGlobalLayoutListener(new OnGlobalLayoutListener() {
@@ -202,7 +195,7 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 	                    String.format("new width=%d; new height=%d", mSurfaceView.getWidth(),
 	                            mSurfaceView.getHeight()));
 	            mSurfaceView.setDirty();
-	            
+
 	            Rect r = new Rect();
 	            //r will be populated with the coordinates of your view that area still visible.
 	            mSurfaceView.getWindowVisibleDisplayFrame(r);
@@ -210,68 +203,77 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 	            if (mSurfaceView.getRootView().getHeight() - (r.bottom - r.top) > 100) { // if more than 100 pixels, its probably a keyboard...
 	                Log.i("DosBoxTurbo", "Keyboard on");
 	                bKeyboard.setChecked(true);
-	                mSurfaceView.mKeyboardVisible = true;
+					// FIXME
+	                // mSurfaceView.mKeyboardVisible = true;
 	            } else {
-	            	Log.i("DosBoxTurbo", "Keyboard off"); 
+	            	Log.i("DosBoxTurbo", "Keyboard off");
 	            	bKeyboard.setChecked(false);
-	            	mSurfaceView.mKeyboardVisible = false;
-	            } 
-	            bKeyboard.setOnCheckedChangeListener(mDosBoxLauncher); 
+					// FIXME
+	            	// mSurfaceView.mKeyboardVisible = false;
+	            }
+	            bKeyboard.setOnCheckedChangeListener(mDosBoxLauncher);
 	        }
 	    });
-	    setSlidingActionBarEnabled(true);
-	    getSlidingMenu().setMode(SlidingMenu.LEFT);
+
+		// FIXME
+	    // setSlidingActionBarEnabled(true);
+	    // getSlidingMenu().setMode(SlidingMenu.LEFT);
 	    getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-	    getSlidingMenu().setTouchModeAbove(SlidingMenu.TOUCHMODE_NONE);
+
+		// FIXME
+	    // getSlidingMenu().setTouchModeAbove(SlidingMenu.TOUCHMODE_NONE);
 
 	    Display display = ((WindowManager) getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay();
-	    getSlidingMenu().setBehindOffset((int) (display.getWidth()/4.0d));
-		getSlidingMenu().setShadowWidthRes(R.dimen.shadow_width);
-		getSlidingMenu().setShadowDrawable(R.drawable.shadow);
-		getSlidingMenu().setFadeDegree(0.35f);
-		
+		// FIXME
+		// getSlidingMenu().setBehindOffset((int) (display.getWidth()/4.0d));
+		// getSlidingMenu().setShadowWidthRes(R.dimen.shadow_width);
+		// getSlidingMenu().setShadowDrawable(R.drawable.shadow);
+		// getSlidingMenu().setFadeDegree(0.35f);
+
     	getSupportActionBar().setBackgroundDrawable(new ColorDrawable(Color.parseColor("#99000000")));
-    	
+
     	// resources
-    	rowCycles = (TableRow)findViewById(R.id.tableRow_Cycles);
-    	rowCycles.setOnClickListener(this);
-    	iCycles = (TextView)findViewById(R.id.info_cycles);
-    	rowFrameSkip = (TableRow)findViewById(R.id.tableRow_FrameSkip);
-    	rowFrameSkip.setOnClickListener(this);
-    	iFrameSkip = (TextView)findViewById(R.id.info_frameskip);
-    	rowInputMode = (TableRow)findViewById(R.id.tableRow_InputMode);
-    	rowInputMode.setOnClickListener(this);
-    	iInputMode = (TextView)findViewById(R.id.info_inputmode);
-    	rowTracking = (TableRow)findViewById(R.id.tableRow_Tracking);
-    	rowTracking.setOnClickListener(this);
-    	iTracking = (TextView)findViewById(R.id.info_tracking);
-    	bKeyboard = (CompoundButton)findViewById(R.id.info_kbdoption);
-    	bKeyboard.setOnCheckedChangeListener(this);
-    	bJoystick = (CompoundButton)findViewById(R.id.info_joyoption);
-    	bJoystick.setOnCheckedChangeListener(this);
-    	bScaling = (CompoundButton)findViewById(R.id.info_scaleoption);
-    	bScaling.setOnCheckedChangeListener(this);
-    	bButtons = (CompoundButton)findViewById(R.id.info_buttonsoption);
-    	bButtons.setOnCheckedChangeListener(this);
-    	rowSpecialKey = (TableRow)findViewById(R.id.tableRow_SpecialKeys);
-    	rowSpecialKey.setOnClickListener(this);
-    	rowSettings = (TableRow)findViewById(R.id.tableRow_Settings);
-    	rowSettings.setOnClickListener(this);
+		initViews();
+	}
 
-    	iGovernor = (TextView)findViewById(R.id.info_governor);
-    	imgGovWarning = (ImageView)findViewById(R.id.info_governor_warning);
-    	iCPUFamily = (TextView)findViewById(R.id.info_cputype);
-    	iCPUNeon = (TextView)findViewById(R.id.info_neon);
-    	iRenderMode = (TextView)findViewById(R.id.info_rendermode);
-    	iDOSMem = (TextView)findViewById(R.id.info_dosmem);
-    	iDBManager = (TextView)findViewById(R.id.info_manager);
-    	iVersion = (TextView)findViewById(R.id.info_version); 
-    	bButtonA = (Button)findViewById(R.id.ButtonA);
-    	bButtonB = (Button)findViewById(R.id.ButtonB);
-    	bButtonC = (Button)findViewById(R.id.ButtonC);
-    	bButtonD = (Button)findViewById(R.id.ButtonD);
-    	
+	private void initViews() {
+		rowCycles = (TableRow)findViewById(R.id.tableRow_Cycles);
+		rowCycles.setOnClickListener(this);
+		iCycles = (TextView)findViewById(R.id.info_cycles);
+		rowFrameSkip = (TableRow)findViewById(R.id.tableRow_FrameSkip);
+		rowFrameSkip.setOnClickListener(this);
+		iFrameSkip = (TextView)findViewById(R.id.info_frameskip);
+		rowInputMode = (TableRow)findViewById(R.id.tableRow_InputMode);
+		rowInputMode.setOnClickListener(this);
+		iInputMode = (TextView)findViewById(R.id.info_inputmode);
+		rowTracking = (TableRow)findViewById(R.id.tableRow_Tracking);
+		rowTracking.setOnClickListener(this);
+		iTracking = (TextView)findViewById(R.id.info_tracking);
+		bKeyboard = (CompoundButton)findViewById(R.id.info_kbdoption);
+		bKeyboard.setOnCheckedChangeListener(this);
+		bJoystick = (CompoundButton)findViewById(R.id.info_joyoption);
+		bJoystick.setOnCheckedChangeListener(this);
+		bScaling = (CompoundButton)findViewById(R.id.info_scaleoption);
+		bScaling.setOnCheckedChangeListener(this);
+		bButtons = (CompoundButton)findViewById(R.id.info_buttonsoption);
+		bButtons.setOnCheckedChangeListener(this);
+		rowSpecialKey = (TableRow)findViewById(R.id.tableRow_SpecialKeys);
+		rowSpecialKey.setOnClickListener(this);
+		rowSettings = (TableRow)findViewById(R.id.tableRow_Settings);
+		rowSettings.setOnClickListener(this);
 
+		iGovernor = (TextView)findViewById(R.id.info_governor);
+		imgGovWarning = (ImageView)findViewById(R.id.info_governor_warning);
+		iCPUFamily = (TextView)findViewById(R.id.info_cputype);
+		iCPUNeon = (TextView)findViewById(R.id.info_neon);
+		iRenderMode = (TextView)findViewById(R.id.info_rendermode);
+		iDOSMem = (TextView)findViewById(R.id.info_dosmem);
+		iDBManager = (TextView)findViewById(R.id.info_manager);
+		iVersion = (TextView)findViewById(R.id.info_version);
+		bButtonA = (Button)findViewById(R.id.ButtonA);
+		bButtonB = (Button)findViewById(R.id.ButtonB);
+		bButtonC = (Button)findViewById(R.id.ButtonC);
+		bButtonD = (Button)findViewById(R.id.ButtonD);
 	}
 
 	@Override
@@ -290,21 +292,21 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 		pauseDosBox(true);
 		super.onPause();
 	}
-	
+
 	@Override
 	protected void onStop() {
 		Log.i("DosBoxTurbo","onStop()");
 		super.onStop();
 	}
-	
+
 	@Override
 	protected void onResume() {
 		Log.i("DosBoxTurbo","onResume()");
 		super.onResume();
 		pauseDosBox(false);
-		
+
 		DBMenuSystem.loadPreference(this,prefs);
-		  
+
 		// set rotation
 		if (Integer.valueOf(prefs.getString("confrotation", "0"))==0) {
 			// auto
@@ -313,27 +315,27 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 			// portrait
 	        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 		} else {
-	        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);			
+	        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
 		}
 
 		// check for developer option "dont keep activities"
 		int value = Settings.System.getInt(getContentResolver(), Settings.System.ALWAYS_FINISH_ACTIVITIES, 0);
 		if (value != 0) {
 			// Dont Keep Activities is enabled
-			Toast.makeText(this, R.string.dontkeepactivities, Toast.LENGTH_SHORT).show();			
+			Toast.makeText(this, R.string.dontkeepactivities, Toast.LENGTH_SHORT).show();
 		} else {
 
 			if (mTurboOn) {
 				Toast.makeText(this, R.string.fastforward, Toast.LENGTH_SHORT).show();
-			} else {			
-				if (DosBoxControl.nativeGetAutoAdjust()) { 
+			} else {
+				if (DosBoxControl.nativeGetAutoAdjust()) {
 					Toast.makeText(this, "Auto Cycles ["+DosBoxControl.nativeGetCycleCount() +"%]", Toast.LENGTH_SHORT).show();
 				} else {
 					Toast.makeText(this, "DosBox Cycles: "+DosBoxControl.nativeGetCycleCount(), Toast.LENGTH_SHORT).show();
 				}
 			}
 		}
-		
+
 		// check orientation to hide actionbar (in landscape)
 		if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
 			getSupportActionBar().hide();
@@ -364,12 +366,12 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
     	mSurfaceView.mDirty.set(true);
 		Log.i("DosBoxTurbo","onResume");
 	}
-	
+
 	@SuppressLint("NewApi")
 	private void quickmenu() {
 		// DosBox Cycles
 
-		if (DosBoxControl.nativeGetAutoAdjust()) { 
+		if (DosBoxControl.nativeGetAutoAdjust()) {
 			iCycles.setText(R.string.auto);
 		} else {
 			iCycles.setText(String.valueOf(DosBoxControl.nativeGetCycleCount()));
@@ -394,7 +396,7 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 				iCPUFamily.setText("ARMv5");
 			}
 		}
-		
+
 		if (mSurfaceView.mGPURendering) {
 			iRenderMode.setText("OpenGL");
 		} else {
@@ -432,13 +434,13 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 			iTracking.setText("Relative");
 		}
 		iGovernor.setText(ReadCPUgovernor());
-		
+
 		bJoystick.setChecked(DBMenuSystem.getBooleanPreference(mContext,"confjoyoverlay"));
 		bScaling.setChecked(DBMenuSystem.getBooleanPreference(mContext,"confscale"));
 		bButtons.setChecked(DBMenuSystem.getBooleanPreference(mContext, "confbuttonoverlay"));
-		
+
 	}
-	
+
 	private String ReadCPUgovernor()
 	 {
 	  ProcessBuilder cmd;
@@ -470,7 +472,7 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 	  }
 	  return result;
 	 }
-	
+
 	@Override
 	public void onConfigurationChanged(Configuration newConfig) {
 	    super.onConfigurationChanged(newConfig);
@@ -479,13 +481,15 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 	    if (newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE) //To fullscreen
 	    {
 	    	getSupportActionBar().hide();
-	    } 
-	    else if (newConfig.orientation == Configuration.ORIENTATION_PORTRAIT) 
+	    }
+	    else if (newConfig.orientation == Configuration.ORIENTATION_PORTRAIT)
 	    {
 	    	getSupportActionBar().show();
 	    }
- 	    getSlidingMenu().setBehindOffset((int) (display.getWidth()/4.0d));
-		getSlidingMenu().requestLayout();
+
+		// FIXME
+ 	    // getSlidingMenu().setBehindOffset((int) (display.getWidth()/4.0d));
+		// getSlidingMenu().requestLayout();
 	}
 
 	@Override
@@ -494,37 +498,38 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 	    getMenuInflater().inflate(R.menu.options,  menu);
 	    return super.onCreateOptionsMenu(menu);
 	}
-	
+
 	@Override
 	public boolean onPrepareOptionsMenu (Menu menu) {
 		super.onPrepareOptionsMenu(menu);
 		return DBMenuSystem.doPrepareOptionsMenu(this, menu);
 	}
-	
+
 	@Override
 	public boolean onOptionsItemSelected(MenuItem item)	{
 		switch (item.getItemId()) {
 		case android.R.id.home:
-			toggle();
+			// FIXME
+			// toggle();
 			return true;
 		}
 		if (DBMenuSystem.doOptionsItemSelected(this, item))
 			return true;
-	    return super.onOptionsItemSelected(item);	    
-	}	
+	    return super.onOptionsItemSelected(item);
+	}
 
 	@Override
 	public void onCreateContextMenu(ContextMenu menu, View v, ContextMenu.ContextMenuInfo menuInfo) {
 		  super.onCreateContextMenu(menu, v, menuInfo);
 		  DBMenuSystem.doCreateContextMenu(this, menu, v, menuInfo);
 	}
-	
+
 	@Override
 	public boolean onContextItemSelected(android.view.MenuItem item) {
 		if (DBMenuSystem.doContextItemSelected(this, item))
 			return true;
-	    return super.onOptionsItemSelected(item);	    
-	}	
+	    return super.onOptionsItemSelected(item);
+	}
 
 	void pauseDosBox(boolean pause) {
 		if (pause) {
@@ -532,35 +537,35 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 
 			nativePause(1);
 			if (mAudioDevice != null)
-				mAudioDevice.pause();			
+				mAudioDevice.pause();
 		}
 		else {
 			nativePause(0);
 			mDosBoxThread.mDosBoxRunning = true;
 			//will auto play audio when have data
 			//if (mAudioDevice != null)
-			//	mAudioDevice.play();		
+			//	mAudioDevice.play();
 		}
 	}
-	
+
 	void initDosBox() {
 		mAudioDevice = new DosBoxAudio(this);
 
-		nativeInit(mDosBoxLauncher); 
+		nativeInit(mDosBoxLauncher);
 
 		String argStartCommand = getIntent().getStringExtra(START_COMMAND_ID);
-		
+
 		if (argStartCommand == null) {
-			argStartCommand = ""; 
+			argStartCommand = "";
 		}
 
 		nativeSetOption(DBMenuSystem.DOSBOX_OPTION_ID_START_COMMAND, 0, argStartCommand, true);
 		nativeSetOption(DBMenuSystem.DOSBOX_OPTION_ID_MIXER_HACK_ON, (mPrefMixerHackOn)?1:0,null, true);
 		nativeSetOption(DBMenuSystem.DOSBOX_OPTION_ID_SOUND_MODULE_ON, (mPrefSoundModuleOn)?1:0,null, true);
-		
+
 		mDosBoxThread = new DosBoxThread(this);
 	}
-	
+
 	void shutDownDosBox() {
 		boolean retry;
 		retry = true;
@@ -571,7 +576,7 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 			}
 			catch (InterruptedException e) { // try again shutting down the thread
 			}
-		}		
+		}
 		nativeShutDown();
 
 		if (mAudioDevice != null) {
@@ -579,29 +584,29 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 			mAudioDevice = null;
 		}
 		mDosBoxThread = null;
-	}	
+	}
 
 	void startDosBox() {
 		if (mDosBoxThread != null)
-			mDosBoxThread.start();		
-		
+			mDosBoxThread.start();
+
 		if ((mSurfaceView != null) && (mSurfaceView.mVideoThread != null))
 			mSurfaceView.mVideoThread.start();
 	}
-	
+
 	void stopDosBox() {
 		nativePause(0);//it won't die if not running
-		
+
 		//stop audio AFTER above
 		if (mAudioDevice != null)
 			mAudioDevice.pause();
-		
+
 		mSurfaceView.mVideoThread.setRunning(false);
 		mSurfaceView.mMouseThread.setRunning(false);
 
-		nativeStop();		
+		nativeStop();
 	}
-	
+
 	public void callbackExit() {
 		if (mDosBoxThread != null)
 			mDosBoxThread.doExit();
@@ -616,7 +621,7 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 		synchronized (mSurfaceView.mDirty) {
 			if (mSurfaceView.mDirty.get()) {
 				mSurfaceView.mStartLine = Math.min(mSurfaceView.mStartLine, s);
-				mSurfaceView.mEndLine = Math.max(mSurfaceView.mEndLine, e);				
+				mSurfaceView.mEndLine = Math.max(mSurfaceView.mEndLine, e);
 			}
 			else {
 				mSurfaceView.mStartLine = s;
@@ -639,7 +644,7 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 		if (newBitmap != null) {
 			mSurfaceView.mBitmap = null;
 			mSurfaceView.mBitmap = newBitmap;
-			
+
 			//locnet, 2011-04-28, support 2.1 or below
 			//mSurfaceView.mVideoBuffer = null;
 			//mSurfaceView.mVideoBuffer = ByteBuffer.allocateDirect(w * h * DBGLSurfaceView.PIXEL_BYTES);
@@ -649,28 +654,28 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 
 		return null;
 	}
-	
+
 	//locnet, 2011-04-28, support 2.1 or below
 	public Buffer callbackVideoGetBuffer() {
 			return null;
-	} 
-	
+	}
+
 	public int callbackAudioInit(int rate, int channels, int encoding, int bufSize) {
 		if (mAudioDevice != null)
 			return mAudioDevice.initAudio(rate, channels, encoding, bufSize);
 		else
 			return 0;
 	}
-	
+
 	public void callbackAudioShutdown() {
-		if (mAudioDevice != null) 
+		if (mAudioDevice != null)
 			mAudioDevice.shutDownAudio();
 	}
-	
+
 	public void callbackAudioWriteBuffer(int size) {
 		if (mAudioDevice != null)
-			mAudioDevice.AudioWriteBuffer(size);		
-	} 
+			mAudioDevice.AudioWriteBuffer(size);
+	}
 
 	public short[] callbackAudioGetBuffer() {
 		if (mAudioDevice != null)
@@ -678,7 +683,7 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 		else
 			return null;
 	}
-	
+
 	class DosBoxThread extends Thread {
 		DBMain mParent;
 		public boolean	mDosBoxRunning = false;
@@ -686,25 +691,25 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 		DosBoxThread(DBMain parent) {
 			mParent =  parent;
 		}
-		
+
 		public void run() {
 			mDosBoxRunning = true;
 			Log.i("DosBoxTurbo", "Using DosBox Config: "+mConfPath+mConfFile);
 			nativeStart(mDosBoxLauncher, mSurfaceView.mBitmap, mSurfaceView.mBitmap.getWidth(), mSurfaceView.mBitmap.getHeight(), mConfPath+mConfFile);
 			//will never return to here;
 		}
-		
-		public void doExit() {			
+
+		public void doExit() {
 			if (mSurfaceView != null) {
 				InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
 				if (imm != null) {
 					imm.hideSoftInputFromWindow(mSurfaceView.getWindowToken(), 0);
 				}
 			}
-			
+
 			mDosBoxRunning = false;
-			mParent.finish();						
-		}		
+			mParent.finish();
+		}
 	}
 
 	public Handler mHandler = new Handler() {
@@ -720,7 +725,7 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 				}
 
 				DBMenuSystem.saveBooleanPreference(mContext,"confjoyoverlay",true);
-				
+
 				break;
 			case HANDLER_REMOVE_JOYSTICK:
 				mJoystickView.setOnJostickMovedListener(null);
@@ -759,7 +764,7 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 			case HANDLER_REMOVE_BUTTONS:
 				mButtonsView.setVisibility(View.GONE);
 				mButtonsView.setOnTouchListener(null);
-				if (bButtons.isChecked()) {         
+				if (bButtons.isChecked()) {
 					bButtons.setChecked(false);
 				}
 				DBMenuSystem.saveBooleanPreference(mContext,"confbuttonoverlay",false);
@@ -780,34 +785,42 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 			    //do something in the user interface to display data from message
 			}
 	  	}
-	}; 
-		
+	};
+
 	@Override
 	public void onClick(View v) {
+		List<Integer> ids = Arrays.asList(
+				R.id.tableRow_Cycles,
+				R.id.tableRow_FrameSkip,
+				R.id.tableRow_SpecialKeys,
+				R.id.tableRow_Tracking,
+				R.id.tableRow_InputMode,
+				R.id.tableRow_Settings
+		);
+
 		// Handle info/quickMenu
-		switch (v.getId()) {
-		case R.id.tableRow_Cycles:
-			mSurfaceView.mContextMenu = DBMenuSystem.CONTEXT_MENU_CYCLES;				
+		switch (ids.indexOf(v.getId())) {
+		case 0:
+			mSurfaceView.mContextMenu = DBMenuSystem.CONTEXT_MENU_CYCLES;
 			openContextMenu(mSurfaceView);
 		break;
-		case R.id.tableRow_FrameSkip:
-			mSurfaceView.mContextMenu = DBMenuSystem.CONTEXT_MENU_FRAMESKIP;				
+		case 1:
+			mSurfaceView.mContextMenu = DBMenuSystem.CONTEXT_MENU_FRAMESKIP;
 			openContextMenu(mSurfaceView);
 		break;
-		case R.id.tableRow_SpecialKeys:
-			mSurfaceView.mContextMenu = DBMenuSystem.CONTEXT_MENU_SPECIAL_KEYS;				
+		case 2:
+			mSurfaceView.mContextMenu = DBMenuSystem.CONTEXT_MENU_SPECIAL_KEYS;
 			openContextMenu(mSurfaceView);
 		break;
-		case R.id.tableRow_Tracking:
+		case 3:
 			mSurfaceView.mContextMenu = DBMenuSystem.CONTEXT_MENU_TRACKING;
 			openContextMenu(mSurfaceView);
 		break;
-		case R.id.tableRow_InputMode:
+		case 4:
 			mSurfaceView.mContextMenu = DBMenuSystem.CONTEXT_MENU_INPUTMODE;
 			openContextMenu(mSurfaceView);
 		break;
-		
-		case R.id.tableRow_Settings:
+		case 5:
 			Intent i = new Intent(mContext, DosBoxPreferences.class);
 			startActivity(i);
 		break;
@@ -816,8 +829,15 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 
 	@Override
 	public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-		switch(buttonView.getId()) {
-		case R.id.info_kbdoption:
+		List<Integer> ids = Arrays.asList(
+				R.id.info_kbdoption,
+				R.id.info_joyoption,
+				R.id.info_scaleoption,
+				R.id.info_buttonsoption
+		);
+
+		switch(ids.indexOf(buttonView.getId())) {
+		case 0:
 			if (isChecked) {
 				if (!mSurfaceView.mKeyboardVisible) {
 					bKeyboard.setOnCheckedChangeListener(null);
@@ -830,21 +850,21 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 					DBMenuSystem.doHideKeyboard(this);
 			}
 		break;
-		case R.id.info_joyoption:
+		case 1:
 			if (isChecked) {
 				mHandler.sendMessage(mHandler.obtainMessage(DBMain.HANDLER_ADD_JOYSTICK,0,0));
 			} else {
 				mHandler.sendMessage(mHandler.obtainMessage(DBMain.HANDLER_REMOVE_JOYSTICK,0,0));
 			}
 		break;
-		case R.id.info_scaleoption:
+		case 2:
 			if (isChecked != mSurfaceView.mScale) {
 				mSurfaceView.mScale = isChecked;
 				DBMenuSystem.saveBooleanPreference(getApplicationContext(), "confscale",mSurfaceView.mScale);
 				mSurfaceView.forceRedraw();
 			}
 		break;
-		case R.id.info_buttonsoption:
+		case 3:
 			if (isChecked) {
 				mHandler.sendMessage(mHandler.obtainMessage(DBMain.HANDLER_ADD_BUTTONS,0,0));
 			} else {
@@ -852,9 +872,8 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 			}
 		break;
 		}
-		
 	}
-		
+
 	public boolean getMIDIRoms() {
 		File ctrlrom = new File(getFilesDir().toString() +"/MT32_CONTROL.ROM");
 		File pcmrom = new File(getFilesDir().toString() +"/MT32_PCM.ROM");
@@ -893,7 +912,7 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 			DBMenuSystem.CopyROM(this,pcmrom);
 			return true;
 		}
-		
+
 		return false;
 	}
 }

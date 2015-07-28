@@ -1,20 +1,35 @@
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    	android:id="@+id/mFrame"
-    	android:splitMotionEvents="true"
-	    android:layout_width="fill_parent"
-	    android:layout_height="fill_parent">
-	<com.fishstix.dosboxfree.DBGLSurfaceView
-	    android:id="@+id/mSurf"
-	    android:layout_width="fill_parent"
-	    android:layout_height="fill_parent"
-	    android:background="@android:color/transparent">
-	</com.fishstix.dosboxfree.DBGLSurfaceView>
-	<!-- <include layout="@layout/button_layout"/>  --> 
- 	<com.fishstix.dosboxfree.joystick.JoystickView
-	    android:id="@+id/mJoystickView"
-	    android:layout_gravity="bottom"
-	    android:layout_width="fill_parent"
-	    android:layout_height="175dp"
-	    android:background="@android:color/transparent" /> 
-	<include layout="@layout/buttons"/>
-</FrameLayout>
+<android.support.v4.widget.DrawerLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <FrameLayout
+        android:id="@+id/mFrame"
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        android:splitMotionEvents="true">
+
+        <com.fishstix.dosboxfree.DBGLSurfaceView
+            android:id="@+id/mSurf"
+            android:layout_width="fill_parent"
+            android:layout_height="fill_parent"
+            android:background="@android:color/transparent" />
+        <!-- <include layout="@layout/button_layout"/>  -->
+        <com.fishstix.dosboxfree.joystick.JoystickView
+            android:id="@+id/mJoystickView"
+            android:layout_width="fill_parent"
+            android:layout_height="175dp"
+            android:layout_gravity="bottom"
+            android:background="@android:color/transparent" />
+
+        <include layout="@layout/buttons" />
+    </FrameLayout>
+
+    <FrameLayout
+        android:id="@+id/menu_container"
+        android:layout_width="280dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="start">
+
+        <include layout="@layout/menu_layout" />
+    </FrameLayout>
+</android.support.v4.widget.DrawerLayout>
