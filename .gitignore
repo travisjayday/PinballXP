@@ -1,2 +1,14 @@
-libs
+.gradle
+.idea
+build
 obj
+local.properties
+*.iml
+*.tmp
+*.log
+*.bak
+*.class
+*~
+
+# files from device
+traces.txt
