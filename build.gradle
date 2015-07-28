@@ -1,4 +1,8 @@
-// Top-level build file where you can add configuration options common to all sub-projects/modules.
+import org.apache.tools.ant.taskdefs.condition.Os
+
+import java.nio.file.FileSystems
+import java.nio.file.Files
+import java.nio.file.attribute.PosixFilePermission
 
 buildscript {
     repositories {
@@ -6,15 +10,80 @@ buildscript {
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:1.2.3'
-
-        // NOTE: Do not place your application dependencies here; they belong
-        // in the individual module build.gradle files
+        classpath 'com.jakewharton.sdkmanager:gradle-plugin:0.12.0'
     }
 }
 
-allprojects {
+subprojects {
     repositories {
         mavenLocal()
         jcenter()
     }
 }
+
+task ndkClean
+ndkClean.dependsOn ':lib-dosbox:ndkClean'
+
+task ndkBuild
+ndkBuild.dependsOn ':lib-dosbox:ndkBuild'
+
+task ndkInstall(action: {
+    def ndkName = 'android-ndk-r10e'
+    def ndkBin = 'ndk-build'
+    def arch = '64'.equals(System.getProperty('sun.arch.data.model')) ? 'x86_64' : 'x86'
+    def ndkDistName
+
+    if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+        ndkDistName = ndkName + '-windows-' + arch + '.exe'
+        ndkBin += '.cmd'
+    } else if (Os.isFamily(Os.FAMILY_MAC)) {
+        ndkDistName = ndkName + '-darwin-' + arch + '.bin'
+    } else if (Os.isFamily(Os.FAMILY_UNIX)) {
+        ndkDistName = ndkName + '-linux-' + arch + '.bin'
+    } else {
+        throw new AssertionError()
+    }
+
+    def ndkHidden = new File(new File(System.getProperty('user.home')), '.android-ndk')
+    def ndkDir = new File(ndkHidden, ndkName)
+    def ndkBuild = new File(ndkDir, ndkBin)
+
+    if (!ndkBuild.exists()) {
+        ndkHidden.mkdirs()
+
+        def ndkUrl = 'http://dl.google.com/android/ndk/' + ndkDistName
+        logger.lifecycle('Downloading ' + ndkUrl)
+        ant.get(src: ndkUrl, dest: ndkHidden, verbose: true, usetimestamp: true)
+
+        def ndkDist = new File(ndkHidden, ndkDistName)
+        ndkDist.setExecutable(true)
+
+        if (!Os.isFamily(Os.FAMILY_WINDOWS)) {
+            def ndkDistPath = FileSystems.getDefault().getPath(ndkDist.absolutePath)
+            def permissions = new HashSet<PosixFilePermission>(Files.getPosixFilePermissions(ndkDistPath))
+            permissions.add(PosixFilePermission.OWNER_EXECUTE)
+            Files.setPosixFilePermissions(ndkDistPath, permissions)
+        }
+
+        logger.lifecycle('Executing ' + ndkDist)
+
+        exec {
+            workingDir = ndkHidden
+            commandLine = [ ndkDist.absolutePath ]
+            standardOutput = new OutputStream() {
+                @Override
+                void write(int b) throws IOException {
+                    // none
+                }
+            }
+        }
+
+        if (!ndkBuild.exists()) {
+            throw new AssertionError('Task failed')
+        }
+
+        PrintStream tmp = new PrintStream(new File(ndkHidden, 'helper'))
+        tmp.println(ndkBuild.absolutePath)
+        tmp.close()
+    }
+})

@@ -1,28 +1,19 @@
-For instructions on how to use FreeBox / DosBox Turbo, please see:
+# DosBox library
 
-  https://sites.google.com/site/dosboxturbo/
+## Build
 
-If you are totally new to DOS emulation on Android, please start with the Beginners Guide:
+ 1. Make sure you have installed [JDK 8][2]
+ 2. One time use command
 
-  https://sites.google.com/site/dosboxturbo/home/beginning-dosbox-turbo-for-newbies
+	`gradlew ndkInstall`
 
-Compilation Details:
+ 3. Build command
 
-An android.mk file is supplied for compilation with the Android NDK.  The compilation has only been
-tested on the Android r8 NDK.
+	`gradlew ndkBuild build`
 
-Required Dependencies:
-* SlidingMenu
-* ActionBarSherlock
+ 4. Clean command
 
-Optional Dependencies:
-* Android SDL Libraries (sdl, sdl_net, sdl_sound)
-* mt32 emu
+    `gradlew ndkClean clean`
 
-## Gradle
-
- 1. Build native sources
-    `./gradlew lib-dosbox:ndkBuild -PNDK_BUILD_PATH=/path/to/android-ndk-r10e/ndk-build`
-
- 2. Build other
-    `./gradlew build`
+ [1]: https://developer.android.com/ndk/downloads/index.html
+ [2]: http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html

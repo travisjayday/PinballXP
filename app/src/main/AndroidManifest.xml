@@ -1,10 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-      package="com.shamanland.dosbox3"
-      android:versionCode="73"
-      android:versionName="2.1.20"
-      android:installLocation="auto" > 
-    <uses-sdk android:minSdkVersion="9" android:targetSdkVersion="21"/>
+    package="com.shamanland.dosbox"
+    android:installLocation="auto">
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
@@ -31,7 +28,7 @@
             </activity>
         <activity android:label="@string/app_name" 
             android:name="com.fishstix.dosboxfree.dosboxprefs.DosBoxPreferences"
-            android:configChanges="keyboardHidden|orientation|screenSize|navigation|keyboard"></activity>
+            android:configChanges="keyboardHidden|orientation|screenSize|navigation|keyboard"/>
         
     </application>
-</manifest> 
+</manifest>

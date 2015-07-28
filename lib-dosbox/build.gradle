@@ -1,3 +1,4 @@
+apply plugin: 'android-sdk-manager'
 apply plugin: 'com.android.library'
 
 android {
@@ -16,13 +17,73 @@ android {
             jniLibs.srcDirs = ['src/main/libs']
         }
     }
+
+    lintOptions {
+        abortOnError false
+    }
 }
 
 dependencies {
     compile 'com.android.support:appcompat-v7:22.2.1'
 }
 
-task ndkBuild(type: Exec) {
-    workingDir 'src/main'
-    commandLine NDK_BUILD_PATH
-}
+task ndkClean(action: {
+    def delete
+    delete = { File f ->
+        if (!f.exists()) {
+            logger.info("No such file: " + f)
+            return
+        }
+
+        if (f.name.startsWith('.')) {
+            logger.info("Ignore hidden file: " + f)
+            return
+        }
+
+        if (f.isDirectory()) {
+            for (File c : f.listFiles()) {
+                delete(c)
+            }
+        }
+
+        if (!f.delete()) {
+            logger.info("File was not deleted: " + f)
+        }
+    }
+
+    delete(new File(projectDir, 'src/main/libs'))
+    delete(new File(projectDir, 'src/main/obj'))
+})
+
+task ndkBuild(action: {
+    def ndkBuild = new File(NDK_BUILD_PATH as String)
+    if (ndkBuild.exists()) {
+        if (ndkBuild.canExecute()) {
+            logger.info('Build using ' + ndkBuild)
+        } else {
+            logger.info('Could not locate ' + ndkBuild)
+            ndkBuild = null
+        }
+    } else {
+        ndkBuild = null
+    }
+
+    if (ndkBuild == null) {
+        def ndkHidden = new File(new File(System.getProperty('user.home')), '.android-ndk')
+        def ndkHelper = new File(ndkHidden, 'helper')
+        if (ndkHelper.exists()) {
+            BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(ndkHelper)))
+            ndkBuild = new File(reader.readLine())
+            reader.close()
+        }
+    }
+
+    if (ndkBuild == null) {
+        throw new AssertionError('Could not locate ndk-build script, try to override NDK_BUILD_PATH property or execute task installNdk')
+    }
+
+    exec {
+        workingDir 'src/main'
+        commandLine ndkBuild.absolutePath
+    }
+})
