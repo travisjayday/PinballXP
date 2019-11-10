@@ -24,7 +24,12 @@
 
 #include <string.h>
 #include <sys/types.h>
-#include <math.h>
+#include "math.h"
+
+// TODO: CHANGE THIS IF NOT NEON
+#if 1
+#include "math_neon.h"
+#endif
 
 #if defined (WIN32)
 //Midi listing
@@ -35,9 +40,6 @@
 #include <mmsystem.h>
 #endif
 
-#if HAVE_NEON
-#include "math_neon.h"
-#endif
 
 #include "SDL.h"
 #include "mem.h"

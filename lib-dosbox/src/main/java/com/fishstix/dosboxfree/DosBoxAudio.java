@@ -22,7 +22,9 @@ package com.fishstix.dosboxfree;
 import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioTrack;
- 
+import android.util.Log;
+import android.widget.Toast;
+
 public class DosBoxAudio 
 {
 	private boolean mAudioRunning=true;

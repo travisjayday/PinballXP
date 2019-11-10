@@ -104,8 +104,9 @@ JNIEXPORT void JNICALL Java_com_fishstix_dosboxfree_DBMain_nativeSetOption(JNIEn
 				}
 			break;
 		case 11:
-			myLoader.frameskip = value;
-			render.frameskip.max = value;
+		//******************* WATCH OUT FRAME SKIP IS ALWAYS ZERO ******; Set to 'value' such that it conforms to prefferences***?//
+			myLoader.frameskip = 0;
+			render.frameskip.max = 0;
 			break;
 		case 12:
 			myLoader.refreshHack = value;

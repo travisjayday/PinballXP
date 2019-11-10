@@ -160,10 +160,10 @@ bool CDROM_Interface_Ioctl::mci_CDPosition(int *position) {
 		case MCI_MODE_PAUSE:
 			mci_status.dwItem = MCI_STATUS_POSITION;
 			if (!mci_CDioctl(MCI_STATUS, flags, &mci_status)) {
-				*position = MSF_TO_FRAMES(
+				/**position = MSF_TO_FRAMES(
 					MCI_MSF_MINUTE(mci_status.dwReturn),
 					MCI_MSF_SECOND(mci_status.dwReturn),
-					MCI_MSF_FRAME(mci_status.dwReturn));
+					MCI_MSF_FRAME(mci_status.dwReturn));*/
 			}
 			return false;	// no error, position read
 		default:

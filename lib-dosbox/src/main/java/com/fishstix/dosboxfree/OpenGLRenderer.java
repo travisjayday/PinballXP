@@ -148,15 +148,33 @@ public class OpenGLRenderer implements GLSurfaceView.Renderer {
 
     	    	b.putString("msg", "GPU Rendering Not Supported. GPU Preference Disabled. Please Restart DosBox Turbo.");
     	    	msg.setData(b);
-    	    	((DBMain)mContext).mHandler.sendMessage(msg);
     		}
     	} 
     }
-    
+
+
+
+    private static byte[] colorToByte(int c){
+        int rgb = c;
+        int blue = rgb & 0xFF;
+        int green = (rgb >> 8) & 0xFF;
+        int red = (rgb >> 16) & 0xFF;
+
+        int r_565 = red >> 3;
+        int g_565 = green >> 2;
+        int b_565 = blue >> 3;
+        int rgb_565 = (r_565 << 11) | (g_565 << 5) | b_565;
+
+        return new byte[]{(byte) ((rgb_565 >> 8) & 0xFF), (byte) (rgb_565 & 0xFF)};
+
+    }
+
     @Override
     public void onDrawFrame(GL10 gl) {
-       //	Log.i("DosBoxTurbo", "onDrawFrame");
+
+        // Log.i("DosBoxTurbo", "onDrawFrame");
         // Just clear the screen and depth buffer.
+
        	loadSingleTexture(gl,mBitmap);
 		gl.glClear(GL10.GL_COLOR_BUFFER_BIT | GL10.GL_DEPTH_BUFFER_BIT);
         // Begin drawing

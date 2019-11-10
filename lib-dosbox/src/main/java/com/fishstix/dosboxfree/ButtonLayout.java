@@ -54,7 +54,7 @@ public class ButtonLayout extends LinearLayout {
       return true; // With this i tell my layout to consume all the touch events from its childs
    }
 	
-	@Override
+	/*@Override
 	public boolean onTouchEvent(MotionEvent ev) {
     	final int action = MotionEventCompat.getActionMasked(ev);
     	final int pointerIndex = MotionEventCompat.getActionIndex(ev);//((action & MotionEvent.ACTION_POINTER_ID_MASK) >> MotionEvent.ACTION_POINTER_ID_SHIFT);
@@ -103,7 +103,7 @@ public class ButtonLayout extends LinearLayout {
             	msg.obj = evt;
             	msg.arg1 = 0;
             	mDBLauncher.mSurfaceView.virtButton[pointerIndex]= true;
-            	mDBLauncher.mSurfaceView.mFilterLongClick = true; 		// prevent long click listener from getting in the way
+            	//mDBLauncher.mSurfaceView.mFilterLongClick = true; 		// prevent long click listener from getting in the way
             	mDBLauncher.mHandler.sendMessage(msg);
             	return true;
             }
@@ -134,11 +134,11 @@ public class ButtonLayout extends LinearLayout {
             	msg.obj = evt;
             	msg.arg1 = 1;
             	mDBLauncher.mSurfaceView.virtButton[pointerIndex]= false;
-            	mDBLauncher.mSurfaceView.mFilterLongClick = false; 
+            	//mDBLauncher.mSurfaceView.mFilterLongClick = false;
             	mDBLauncher.mHandler.sendMessage(msg);
             	return true;
             }
        	}
 		return false;
-	}
+	}*/
 }

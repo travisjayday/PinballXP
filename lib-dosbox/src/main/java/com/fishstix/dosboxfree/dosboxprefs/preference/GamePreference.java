@@ -208,7 +208,7 @@ public class GamePreference extends DialogPreference implements OnKeyListener, O
     				  error = true;
     				  mHardCode = "-1";
     				  mDosCode = "-1";
-    				  Toast.makeText(ctx, R.string.duplicatemap,Toast.LENGTH_SHORT).show();
+    				  //Toast.makeText(ctx, R.string.duplicatemap,Toast.LENGTH_SHORT).show();
     				  break;
     			  }
     		  }

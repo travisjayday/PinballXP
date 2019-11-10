@@ -1,2 +1,2 @@
-include ':app'
+include ':app', ':adcolony-sdk-3.1.2'
 include ':lib-dosbox'

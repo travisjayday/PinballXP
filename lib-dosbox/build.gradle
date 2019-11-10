@@ -1,15 +1,33 @@
-apply plugin: 'android-sdk-manager'
+//apply plugin: 'android-sdk-manager'
 apply plugin: 'com.android.library'
 
 android {
-    compileSdkVersion 22
-    buildToolsVersion "22.0.1"
+    compileSdkVersion 26
+    //buildToolsVersion "22.0.1"
+
 
     defaultConfig {
-        minSdkVersion 15
-        targetSdkVersion 22
+        minSdkVersion 23
+        targetSdkVersion 26
+          multiDexEnabled true
+
     }
 
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android.txt'),
+                    'proguard-rules.pro'
+        }
+        debug {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android.txt'),
+                    'proguard-rules.pro'
+        }
+    }
+    dexOptions {
+        javaMaxHeapSize "3g"
+    }
     sourceSets {
         main {
             // NOTE disable automatic ndk-build
@@ -23,9 +41,35 @@ android {
     }
 }
 
-dependencies {
-    compile 'com.android.support:appcompat-v7:22.2.1'
+
+allprojects {
+    repositories {
+     //   maven {
+      //      url 'https://maven.google.com'
+       // }
+        google()
+    }
 }
+dependencies {
+
+    compile 'com.android.support:appcompat-v7:27.0.2'
+    compile ('com.google.android.gms:play-services-ads:11.8.0') {
+        exclude group: 'com.android.support'
+    }
+ /*  compile ('com.google.android.gms:play-services-location:10.2.1') {
+        exclude group: 'com.android.support'
+    }*/
+    compile project(':adcolony-sdk-3.1.2')
+    //  compile 'com.squareup.picasso:picasso:2.5.2'
+    //for Inmobi
+    compile fileTree(dir: '/root/Programming/Android/dosbox/libs/', include: ['*.jar'])
+    compile 'com.android.billingclient:billing:1.0'
+}
+
+
+
+
+
 
 task ndkClean(action: {
     def delete
@@ -56,7 +100,8 @@ task ndkClean(action: {
 })
 
 task ndkBuild(action: {
-    def ndkBuild = new File(NDK_BUILD_PATH as String)
+    //def ndkBuild = new File(NDK_BUILD_PATH as String)
+    def ndkBuild = new File("/root/Downloads/android-ndk-r10e/ndk-build")
     if (ndkBuild.exists()) {
         if (ndkBuild.canExecute()) {
             logger.info('Build using ' + ndkBuild)
@@ -86,4 +131,177 @@ task ndkBuild(action: {
         workingDir 'src/main'
         commandLine ndkBuild.absolutePath
     }
+
+})
+
+task ndkBuildFull(action: {
+
+    exec {
+        workingDir 'src/main'
+        executable "cp"
+        args "jni/Application.mk.arm", "jni/Application.mk"
+    }
+
+    exec {
+        workingDir 'src/main'
+        executable "cp"
+        args "jni/dosbox/config.h.arm", "jni/dosbox/config.h"
+    }
+//////////////////////////////////////
+    //def ndkBuild = new File(NDK_BUILD_PATH as String)
+    def ndkBuild = new File("/root/Downloads/android-ndk-r10e/ndk-build")
+    if (ndkBuild.exists()) {
+        if (ndkBuild.canExecute()) {
+            logger.info('Build using ' + ndkBuild)
+        } else {
+            logger.info('Could not locate ' + ndkBuild)
+            ndkBuild = null
+        }
+    } else {
+        ndkBuild = null
+    }
+
+    if (ndkBuild == null) {
+        def ndkHidden = new File(new File(System.getProperty('user.home')), '.android-ndk')
+        def ndkHelper = new File(ndkHidden, 'helper')
+        if (ndkHelper.exists()) {
+            BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(ndkHelper)))
+            ndkBuild = new File(reader.readLine())
+            reader.close()
+        }
+    }
+
+    if (ndkBuild == null) {
+        throw new AssertionError('Could not locate ndk-build script, try to override NDK_BUILD_PATH property or execute task installNdk')
+    }
+
+    exec {
+        workingDir 'src/main'
+        commandLine ndkBuild.absolutePath
+    }
+    ////////////////////////////////
+
+    exec {
+        workingDir 'src/main'
+        executable "cp"
+        args "-r", "libs/armeabi-v7a", "libs/armeabi-v7a.bak"
+    }
+
+    exec {
+        workingDir 'src/main'
+        executable "cp"
+        args "jni/Application.mk.x86", "jni/Application.mk"
+    }
+
+    exec {
+        workingDir 'src/main'
+        executable "cp"
+        args "jni/dosbox/config.h.x86", "jni/dosbox/config.h"
+    }
+
+/////////////////////////////////////////////////////////
+    //def ndkBuild = new File(NDK_BUILD_PATH as String)
+//    def ndkBuild = new File("/root/Downloads/android-ndk-r10e/ndk-build")
+    if (ndkBuild.exists()) {
+        if (ndkBuild.canExecute()) {
+            logger.info('Build using ' + ndkBuild)
+        } else {
+            logger.info('Could not locate ' + ndkBuild)
+            ndkBuild = null
+        }
+    } else {
+        ndkBuild = null
+    }
+
+    if (ndkBuild == null) {
+        def ndkHidden = new File(new File(System.getProperty('user.home')), '.android-ndk')
+        def ndkHelper = new File(ndkHidden, 'helper')
+        if (ndkHelper.exists()) {
+            BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(ndkHelper)))
+            ndkBuild = new File(reader.readLine())
+            reader.close()
+        }
+    }
+
+    if (ndkBuild == null) {
+        throw new AssertionError('Could not locate ndk-build script, try to override NDK_BUILD_PATH property or execute task installNdk')
+    }
+
+    exec {
+        workingDir 'src/main'
+        commandLine ndkBuild.absolutePath
+    }
+    /////////////////////////////////////////////
+
+    exec {
+        workingDir 'src/main'
+        executable "cp"
+        args "libs/armeabi-v7a.bak/libdosbox.so", "libs/armeabi-v7a"
+    }
+
+    exec {
+        workingDir 'src/main'
+        executable "cp"
+        args "libs/armeabi-v7a.bak/libfishstix_util.so", "libs/armeabi-v7a"
+    }
+
+    exec {
+        workingDir 'src/main'
+        executable "cp"
+        args "libs/armeabi-v7a.bak/libSDL2.so", "libs/armeabi-v7a"
+    }
+
+    exec {
+        workingDir 'src/main'
+        executable "rm"
+        args "-r", "libs/armeabi-v7a.bak"
+    }
+})
+
+task ndkBuildArm(action: {
+
+    exec {
+        workingDir 'src/main'
+        executable "cp"
+        args "jni/Application.mk.arm", "jni/Application.mk"
+    }
+
+    exec {
+        workingDir 'src/main'
+        executable "cp"
+        args "jni/dosbox/config.h.arm", "jni/dosbox/config.h"
+    }
+//////////////////////////////////////
+    //def ndkBuild = new File(NDK_BUILD_PATH as String)
+    def ndkBuild = new File("/root/Downloads/android-ndk-r10e/ndk-build")
+    if (ndkBuild.exists()) {
+        if (ndkBuild.canExecute()) {
+            logger.info('Build using ' + ndkBuild)
+        } else {
+            logger.info('Could not locate ' + ndkBuild)
+            ndkBuild = null
+        }
+    } else {
+        ndkBuild = null
+    }
+
+    if (ndkBuild == null) {
+        def ndkHidden = new File(new File(System.getProperty('user.home')), '.android-ndk')
+        def ndkHelper = new File(ndkHidden, 'helper')
+        if (ndkHelper.exists()) {
+            BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(ndkHelper)))
+            ndkBuild = new File(reader.readLine())
+            reader.close()
+        }
+    }
+
+    if (ndkBuild == null) {
+        throw new AssertionError('Could not locate ndk-build script, try to override NDK_BUILD_PATH property or execute task installNdk')
+    }
+
+    exec {
+        workingDir 'src/main'
+        commandLine ndkBuild.absolutePath
+    }
+    ////////////////////////////////
 })

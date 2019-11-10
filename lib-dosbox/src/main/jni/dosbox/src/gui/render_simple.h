@@ -40,18 +40,19 @@ static void conc4d(SCALERNAME,SBPP,DBPP,R)(const void *s) {
 	SRCTYPE *cache = (SRCTYPE*)(render.scale.cacheRead);
 	render.scale.cacheRead += render.scale.cachePitch;
 	PTYPE * line0=(PTYPE *)(render.scale.outWrite);
+    //line0[0];
 #if (SBPP == 9)
 	for (Bits x=render.src.width;x>0;) {
 		if (*(Bit32u const*)src == *(Bit32u*)cache && !(
-			render.pal.modified[src[0]] | 
-			render.pal.modified[src[1]] | 
-			render.pal.modified[src[2]] | 
+			render.pal.modified[src[0]] |
+			render.pal.modified[src[1]] |
+			render.pal.modified[src[2]] |
 			render.pal.modified[src[3]] )) {
 			x-=4;
 			src+=4;
 			cache+=4;
 			line0+=4*SCALERWIDTH;
-#else 
+#else
 	for (Bits x=render.src.width;x>0;) {
 		if (*(Bitu const*)src == *(Bitu*)cache) {
 			x-=(sizeof(Bitu)/sizeof(SRCTYPE));
@@ -61,17 +62,17 @@ static void conc4d(SCALERNAME,SBPP,DBPP,R)(const void *s) {
 #endif
 		} else {
 #if defined(SCALERLINEAR)
-#if (SCALERHEIGHT > 1) 
+#if (SCALERHEIGHT > 1)
 			PTYPE *line1 = WC[0];
 #endif
-#if (SCALERHEIGHT > 2) 
+#if (SCALERHEIGHT > 2)
 			PTYPE *line2 = WC[1];
 #endif
 #else
-#if (SCALERHEIGHT > 1) 
+#if (SCALERHEIGHT > 1)
 		PTYPE *line1 = (PTYPE *)(((Bit8u*)line0)+ render.scale.outPitch);
 #endif
-#if (SCALERHEIGHT > 2) 
+#if (SCALERHEIGHT > 2)
 		PTYPE *line2 = (PTYPE *)(((Bit8u*)line0)+ render.scale.outPitch * 2);
 #endif
 #endif //defined(SCALERLINEAR)

@@ -23,16 +23,39 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.Buffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+
+import com.android.billingclient.api.BillingClient;
+import com.android.billingclient.api.BillingClientStateListener;
+import com.android.billingclient.api.Purchase;
+import com.android.billingclient.api.PurchaseHistoryResponseListener;
+import com.android.billingclient.api.PurchasesUpdatedListener;
+import com.android.billingclient.api.SkuDetails;
+import com.android.billingclient.api.SkuDetailsParams;
+import com.android.billingclient.api.SkuDetailsResponseListener;
+import com.appodeal.ads.Appodeal;
 import com.fishstix.dosboxfree.dosboxprefs.DosBoxPreferences;
+import com.fishstix.dosboxfree.dosboxprefs.preference.HardCodeWrapper;
 import com.fishstix.dosboxfree.joystick.JoystickView;
+import com.shamanland.adosbox2.DosHDD;
+import com.fishstix.dosboxfree.SplashScreen;
+
+import android.Manifest;
+import android.accounts.Account;
+import android.accounts.AccountManager;
 import android.annotation.SuppressLint;
+import android.app.AlarmManager;
+import android.app.PendingIntent;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
@@ -44,6 +67,10 @@ import android.os.Handler;
 import android.os.Message;
 import android.preference.PreferenceManager;
 import android.provider.Settings;
+import android.support.annotation.Nullable;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
+import android.support.v7.app.AlertDialog;
 import android.util.Log;
 import android.view.ContextMenu;
 import android.view.Display;
@@ -51,8 +78,10 @@ import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
+import android.view.ViewGroup;
 import android.view.ViewGroup.LayoutParams;
 import android.view.ViewTreeObserver;
 import android.view.ViewTreeObserver.OnGlobalLayoutListener;
@@ -64,23 +93,27 @@ import android.widget.CompoundButton;
 import android.widget.CompoundButton.OnCheckedChangeListener;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.SeekBar;
 import android.widget.TableRow;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import android.support.v7.app.AppCompatActivity;
 
-public class DBMain extends AppCompatActivity implements OnClickListener, OnCheckedChangeListener {
+import static com.fishstix.dosboxfree.DBMenuSystem.KEYCODE_F1;
+import static com.fishstix.dosboxfree.DBMenuSystem.getBooleanPreference;
+import static com.fishstix.dosboxfree.DBMenuSystem.saveBooleanPreference;
+import static com.fishstix.dosboxfree.DBMenuSystem.savePreference;
+
+public class DBMain extends AppCompatActivity {
+    public static String PACKAGE_NAME;
+    public static final String TAG = "DosBoxTurbo";
 	public static final int SPLASH_TIMEOUT_MESSAGE = -1;
 	public static final String START_COMMAND_ID = "start_command";
 	public String mConfFile = DosBoxPreferences.CONFIG_FILE;
 	//public String mConfPath = DosBoxPreferences.CONFIG_PATH;
 	public String mConfPath;
-	public static final int HANDLER_ADD_JOYSTICK = 20;
-	public static final int HANDLER_REMOVE_JOYSTICK = 21;
-	public static final int HANDLER_ADD_BUTTONS = 22;
-	public static final int HANDLER_REMOVE_BUTTONS = 23;
-	public static final int HANDLER_SEND_KEYCODE = 1011;
 	public static final int HANDLER_DISABLE_GPU = 323;
 
 	public native void nativeInit(Object ctx);
@@ -101,6 +134,7 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 	public SharedPreferences prefs;
 	private static DBMain mDosBoxLauncher = null;
 	public FrameLayout mFrameLayout = null;
+	SplashScreen mSplashScreen;
 
 	public boolean mPrefScaleFilterOn = false;
 	public boolean mPrefSoundModuleOn = true;
@@ -109,32 +143,184 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 	public String mPID = null;
 	public int mPrefScaleFactor = 100;
 	private Context mContext;
-	private TableRow rowCycles,rowFrameSkip,rowInputMode,rowTracking,rowSpecialKey,rowSettings;//,rowMapMouse,rowMapJoy;
-	public TextView iCycles,iFrameSkip,iInputMode,iTracking;
-	private TextView iGovernor,iCPUFamily,iCPUNeon,iDOSMem, iDBManager, iVersion, iRenderMode;
-	public CompoundButton bKeyboard,bJoystick,bScaling,bButtons;
-	private ImageView imgGovWarning;
-	public Button bButtonA,bButtonB,bButtonC,bButtonD;
+	public Button bButtonA,bButtonB,bButtonC,bButtonD, bPortraitScale, bShowKeyboard;
+	public SeekBar spaceSeekBar;
+	public BillingManager mBillingManager = null;
+	public UpdateListener mUpdateListener = null;
 
-	// Private Views
-	public JoystickView mJoystickView = null;
-	public ButtonLayout mButtonsView = null;
+	public LinearLayout mButtonsView = null;
 
-    static {
+	private boolean permissionsOk = false;
+	boolean showingKeyboard = false;
+	private int locationTries = 3;
+	boolean firstTime = false;
+	boolean showingControls = false;
+
+	static {
+		System.loadLibrary("SDL2");
+		System.loadLibrary("dosbox");
         System.loadLibrary("fishstix_util");
-    }
+
+	}
+
+
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
-	    Log.i("DosBoxTurbo", "onCreate()");
+		Log.i(TAG, "onCreate()");
 		mDosBoxLauncher = this;
-	    requestWindowFeature(Window.FEATURE_ACTION_BAR_OVERLAY);
+		PACKAGE_NAME = getApplicationContext().getPackageName();
+
+		mContext = this;
+		prefs = PreferenceManager.getDefaultSharedPreferences(this);
+
+		//requestWindowFeature(Window.FEATURE_ACTION_BAR_OVERLAY);
 
 		super.onCreate(savedInstanceState);
 
-		setContentView(R.layout.main);
-		// FIXME
-		// setBehindContentView(R.layout.menu_layout);
-		mContext = this;
+		setContentView(R.layout.main_nomenu);
+		initViews();
+		evalPermissions();
+
+	}
+
+	void evalPermissions() {
+		if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+			if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.WRITE_EXTERNAL_STORAGE))
+				showAlertDialog("PinballXP needs permission to save / load game files from the SDCard. It will not access/modify any other data.", Manifest.permission.WRITE_EXTERNAL_STORAGE);
+			else
+				ActivityCompat.requestPermissions(this,
+					new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.GET_ACCOUNTS},
+					0);
+			return;
+		}
+
+		SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+		boolean wantsLocation = sharedPreferences.getBoolean("wantsLocation", true);
+
+		if (wantsLocation && ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+			if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_COARSE_LOCATION))
+				showAlertDialog("To show relavent & enjoyable ads, Pinball XP needs to access your general location (country) through Wi-Fi.", Manifest.permission.ACCESS_COARSE_LOCATION);
+			else
+				ActivityCompat.requestPermissions(this,
+					new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
+					0);
+			if (locationTries > 0) {
+				locationTries--;
+				return;
+			}
+			else {
+				sharedPreferences.edit().putBoolean("wantsLocation", false).commit();
+			}
+		}
+		permissionsOk = true;
+		startApp();
+	}
+
+	private void showAlertDialog(String info, final String permission) {
+		AlertDialog.Builder builder = new AlertDialog.Builder(this);
+		builder.setMessage(info).setNeutralButton("Ok!", new DialogInterface.OnClickListener() {
+			@Override
+			public void onClick(DialogInterface dialog, int which) {
+				ActivityCompat.requestPermissions((DBMain) mContext,
+						new String[]{permission},
+						0);
+			}
+		});
+		// Create the AlertDialog object and return it
+		builder.create();
+		builder.show();
+	}
+
+	public void startApp() {
+
+		/*if (nativeHasNEON(this)) {
+			System.loadLibrary("neonlib");
+		}*/
+
+		if (mSplashScreen == null) {
+			mSplashScreen = new SplashScreen();
+		}
+
+		mSplashScreen.dbMain = this;
+
+        boolean reextract = false;
+        int versionCodeReal = -1;
+
+		try {
+			PackageInfo pInfo = this.getPackageManager().getPackageInfo(getPackageName(), 0);
+			versionCodeReal = pInfo.versionCode;
+		} catch (PackageManager.NameNotFoundException e) {
+			e.printStackTrace();
+		}
+
+		SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+		int versionCode = sharedPreferences.getInt("VERSION_CODE", -1);
+
+		if(versionCode != versionCodeReal) {
+			reextract = true;
+		}
+		sharedPreferences.edit().putInt("VERSION_CODE", versionCodeReal).apply();
+
+        //scrn.showControlls();
+		// Create HDD from zipped file
+		if (!DosHDD.hddExists() || reextract) {
+			mSplashScreen.showControlls();
+			Toast.makeText(this, "Extracting game files... Do NOT close app!", Toast.LENGTH_SHORT).show();
+			Log.i(TAG, "First Time Install or Update!");
+		    // first time start presumably
+            //Toast.makeText(mContext, "First time start: Please Wait...", Toast.LENGTH_LONG).show();
+            // mSplashScreen.showControlls();
+		    Log.i(TAG,"Dos HDD not found, creating...");
+
+            Thread t = new Thread(new Runnable() {
+                public void run() {
+                    if (!DosHDD.createHdd(mContext))
+                        Log.i(TAG, "Failed to create Dos HDD");
+                    Log.i(TAG, "Stopping Unzip Thread...");
+					//DBMain app = (DBMain)mContext;
+
+					//while (app.mButtonsView.getVisibility() != View.GONE);
+
+					//app.runOnUiThread(new Runnable() {
+					/*	@Override
+						public void run() {
+							DBMain app = (DBMain) mContext;
+							if (app.mSplashScreen.showedControlls)
+								app.recreate();
+							else
+								app.mSplashScreen.showedControlls = true;
+						}
+					});*/
+
+					/*Intent mStartActivity = new Intent(mContext, DBMain.class);
+					int mPendingIntentId = 123456;
+					PendingIntent mPendingIntent = PendingIntent.getActivity(mContext, mPendingIntentId,    mStartActivity, PendingIntent.FLAG_CANCEL_CURRENT);
+					AlarmManager mgr = (AlarmManager)mContext.getSystemService(Context.ALARM_SERVICE);
+					mgr.set(AlarmManager.RTC, System.currentTimeMillis() + 100, mPendingIntent);*/
+
+					mDosBoxLauncher.runOnUiThread(new Runnable() {
+						@Override
+						public void run() {
+							Toast.makeText(mContext, "Install complete. Restarting App...", Toast.LENGTH_LONG).show();
+
+							if (mSplashScreen.showedControlls) {
+								restartApp();
+							}
+							else {
+								mSplashScreen.showedControlls = true;
+							}
+						}
+					});
+                }
+            });
+            t.start();
+            return;
+
+        }
+		createBilling();
+
+		Log.i(TAG, "Dos HDD found!");
+		mSplashScreen.showTitle(firstTime);
 
 		mConfPath = DosBoxPreferences.getExternalDosBoxDir(mContext);
 		this.getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN);
@@ -142,173 +328,403 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 	    getWindow().addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
 
 		PreferenceManager.setDefaultValues(this, R.xml.preferences, false);
-		prefs = PreferenceManager.getDefaultSharedPreferences(this);
 
-
-		// copy mt32 libs (if necessary)
-		if (!DBMenuSystem.MT32_ROM_exists(this)) {
-			getMIDIRoms();
+		if (nativeHasNEON(this)) {
+			Log.i(TAG, "NEON DETECTED");
 		}
-		System.loadLibrary("dosbox");
-
-
-		mFrameLayout = (FrameLayout)findViewById(R.id.mFrame);
-		mSurfaceView = (DBGLSurfaceView)findViewById(R.id.mSurf);
-		mJoystickView = (JoystickView)findViewById(R.id.mJoystickView);
-		mButtonsView = (ButtonLayout)findViewById(R.id.ButtonLayout);
-		mJoystickView.setVisibility(View.GONE);
-		mButtonsView.setVisibility(View.GONE);
-		mButtonsView.mDBLauncher = this;
+		else {
+			Log.i(TAG, "NO NEON SUPPORT");
+		}
 		registerForContextMenu(mSurfaceView);
 
 		getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
-		if (prefs.getBoolean("dosmanualconf", false)) {
-			File f;
-			f = new File(prefs.getString("dosmanualconf_file", DosBoxPreferences.getExternalDosBoxDir(mContext)+DosBoxPreferences.CONFIG_FILE));
-
-			mConfPath = f.getParent()+"/";
-			mConfFile = f.getName();
-			if (!f.exists()) {
-				Log.i("DosBoxTurbo","Config file not found: "+f.getAbsolutePath());
-			}
-		}
-		mSurfaceView.mGPURendering = prefs.getBoolean("confgpu", false);
 		DBMenuSystem.loadPreference(this,prefs);
+		//mSurfaceView.mGPURendering = true; //prefs.getBoolean("confgpu", false);
 
-		initDosBox();
-		startDosBox();
+		String cmd =    "mount c: " + DosHDD.hddLocation() + " -freesize 128\n" +
+				"c:\n" +
+				"cadet\n";
 
-		try {
-			Thread.sleep(2000);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
+		prefs.edit().putString("dosautoexec",cmd).commit();
+		boolean scaleState = DBMenuSystem.getBooleanPreference(mContext, "confscale");
+		mSurfaceView.mScale = scaleState;
+		if (scaleState)
+			bPortraitScale.setText("-");
+		else
+			bPortraitScale.setText("+");
 
-		// calculate joystick constants
-		ViewTreeObserver observer = mSurfaceView.getViewTreeObserver();
-		observer.addOnGlobalLayoutListener(new OnGlobalLayoutListener() {
-	        public void onGlobalLayout() {
-	    		// re-calculate joystick constants
-	        	mSurfaceView.mActionBarHeight = getSupportActionBar().getHeight();
-	            Log.v("DosBoxTurbo",
-	                    String.format("new width=%d; new height=%d", mSurfaceView.getWidth(),
-	                            mSurfaceView.getHeight()));
-	            mSurfaceView.setDirty();
-
-	            Rect r = new Rect();
-	            //r will be populated with the coordinates of your view that area still visible.
-	            mSurfaceView.getWindowVisibleDisplayFrame(r);
-	            bKeyboard.setOnCheckedChangeListener(null);
-	            if (mSurfaceView.getRootView().getHeight() - (r.bottom - r.top) > 100) { // if more than 100 pixels, its probably a keyboard...
-	                Log.i("DosBoxTurbo", "Keyboard on");
-	                bKeyboard.setChecked(true);
-					// FIXME
-	                // mSurfaceView.mKeyboardVisible = true;
-	            } else {
-	            	Log.i("DosBoxTurbo", "Keyboard off");
-	            	bKeyboard.setChecked(false);
-					// FIXME
-	            	// mSurfaceView.mKeyboardVisible = false;
-	            }
-	            bKeyboard.setOnCheckedChangeListener(mDosBoxLauncher);
-	        }
-	    });
-
-		// FIXME
-	    // setSlidingActionBarEnabled(true);
-	    // getSlidingMenu().setMode(SlidingMenu.LEFT);
-	    getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-
-		// FIXME
-	    // getSlidingMenu().setTouchModeAbove(SlidingMenu.TOUCHMODE_NONE);
-
-	    Display display = ((WindowManager) getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay();
-		// FIXME
-		// getSlidingMenu().setBehindOffset((int) (display.getWidth()/4.0d));
-		// getSlidingMenu().setShadowWidthRes(R.dimen.shadow_width);
-		// getSlidingMenu().setShadowDrawable(R.drawable.shadow);
-		// getSlidingMenu().setFadeDegree(0.35f);
-
-    	getSupportActionBar().setBackgroundDrawable(new ColorDrawable(Color.parseColor("#99000000")));
-
-    	// resources
-		initViews();
+		initStartDosBox();
 	}
 
-	private void initViews() {
-		rowCycles = (TableRow)findViewById(R.id.tableRow_Cycles);
-		rowCycles.setOnClickListener(this);
-		iCycles = (TextView)findViewById(R.id.info_cycles);
-		rowFrameSkip = (TableRow)findViewById(R.id.tableRow_FrameSkip);
-		rowFrameSkip.setOnClickListener(this);
-		iFrameSkip = (TextView)findViewById(R.id.info_frameskip);
-		rowInputMode = (TableRow)findViewById(R.id.tableRow_InputMode);
-		rowInputMode.setOnClickListener(this);
-		iInputMode = (TextView)findViewById(R.id.info_inputmode);
-		rowTracking = (TableRow)findViewById(R.id.tableRow_Tracking);
-		rowTracking.setOnClickListener(this);
-		iTracking = (TextView)findViewById(R.id.info_tracking);
-		bKeyboard = (CompoundButton)findViewById(R.id.info_kbdoption);
-		bKeyboard.setOnCheckedChangeListener(this);
-		bJoystick = (CompoundButton)findViewById(R.id.info_joyoption);
-		bJoystick.setOnCheckedChangeListener(this);
-		bScaling = (CompoundButton)findViewById(R.id.info_scaleoption);
-		bScaling.setOnCheckedChangeListener(this);
-		bButtons = (CompoundButton)findViewById(R.id.info_buttonsoption);
-		bButtons.setOnCheckedChangeListener(this);
-		rowSpecialKey = (TableRow)findViewById(R.id.tableRow_SpecialKeys);
-		rowSpecialKey.setOnClickListener(this);
-		rowSettings = (TableRow)findViewById(R.id.tableRow_Settings);
-		rowSettings.setOnClickListener(this);
+	public void createBilling() {
+		if (mUpdateListener == null)
+			mUpdateListener = new UpdateListener();
+		if (mBillingManager == null)
+			mBillingManager = new BillingManager(this, mUpdateListener);
+	}
 
-		iGovernor = (TextView)findViewById(R.id.info_governor);
-		imgGovWarning = (ImageView)findViewById(R.id.info_governor_warning);
-		iCPUFamily = (TextView)findViewById(R.id.info_cputype);
-		iCPUNeon = (TextView)findViewById(R.id.info_neon);
-		iRenderMode = (TextView)findViewById(R.id.info_rendermode);
-		iDOSMem = (TextView)findViewById(R.id.info_dosmem);
-		iDBManager = (TextView)findViewById(R.id.info_manager);
-		iVersion = (TextView)findViewById(R.id.info_version);
+	public void restartApp() {
+
+		Intent mStartActivity = new Intent(mContext, DBMain.class);
+		int mPendingIntentId = 123456;
+		PendingIntent mPendingIntent = PendingIntent.getActivity(mContext, mPendingIntentId, mStartActivity, PendingIntent.FLAG_CANCEL_CURRENT);
+		AlarmManager mgr = (AlarmManager) mContext.getSystemService(Context.ALARM_SERVICE);
+		mgr.set(AlarmManager.RTC, System.currentTimeMillis() + 100, mPendingIntent);
+
+		System.exit(0);
+	}
+
+	@Override
+	public void onRequestPermissionsResult(int requestCode,
+										   String permissions[], int[] grantResults) {
+		Log.i(TAG, "Permission Granted");
+		evalPermissions();
+	}
+
+ 	@Override
+	protected void onActivityResult(int requestCode, int resultCode, Intent data)
+	{
+		if (requestCode == 1) {
+			if (resultCode == RESULT_OK) {
+				String act = data.getStringExtra(AccountManager.KEY_ACCOUNT_NAME);
+				Log.d(TAG, "Selected account " + act);
+				String target = "marco.lova13@gmail.com";
+				if (act.equals(target)) {
+					Log.d(TAG, "account equals special account. Disabling ads...");
+					prefs.edit().putBoolean("ads_off", true).commit();
+					Toast.makeText(this, "Disabled ads. Please restart the app for changes to take effect.", Toast.LENGTH_LONG).show();
+				}
+				else {
+					Toast.makeText(this, "Failed to Authenticate for disabling ads. Selected: " + act + "; Target: " + target, Toast.LENGTH_LONG).show();
+				}
+			}
+		}
+	}
+
+	@Override
+	public void onWindowFocusChanged(boolean hasFocus) {
+		super.onWindowFocusChanged(hasFocus);
+		if (hasFocus) {
+			getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+					| View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+					| View.SYSTEM_UI_FLAG_FULLSCREEN
+					| View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+		}
+	}
+
+	public class UpdateListener implements BillingManager.BillingUpdatesListener {
+		@Override
+		public void onBillingClientSetupFinished() {
+		//	mActivity.onBillingManagerSetupFinished();
+		}
+
+		@Override
+		public void onConsumeFinished(String token, @BillingClient.BillingResponse int result) {
+		}
+
+		@Override
+		public void onPurchasesUpdated(List<Purchase> purchaseList) {
+
+			for (Purchase purchase : purchaseList) {
+				if (purchase.getSku().equals("no_ads")) {
+					//Toast.makeText(mContext, "You've purchased No Ads! Restart App to instigate changes", Toast.LENGTH_LONG).show();
+					//DBMenuSystem.doConfirmQuit((DBMain)mContext);
+					Log.i(TAG, "Ad status: DISABLED");
+					mBillingManager.boughtNoAds = true;
+					return;
+				}
+			}
+			mBillingManager.boughtNoAds = false;
+
+
+			String appKey = "f8ecea605126edd53010ef78eafcd8dd3c6208802a6f2e7d";
+
+			boolean disabledAds = prefs.getBoolean("ads_off", false);
+
+			if(disabledAds == false) {
+				Intent intent = AccountManager.newChooseAccountIntent(null, null, new String[]{"com.google"},null, null, null, null);
+				startActivityForResult(intent, 1);
+			}
+			else {
+				Log.d(TAG, "Ads have been disabled due to special account found.");
+				Toast.makeText(getApplicationContext(), "Ads disabld for Marco :-)", Toast.LENGTH_SHORT).show();
+				return;
+			}
+
+				/*Account[] accounts = AccountManager.get(getApplicationContext()).getAccountsByType("com.google");
+			for (Account act : accounts) {
+				Log.d(TAG, "Found account: " + act.name);
+				if (act.name.equals("travisjayday@gmail.com")) {
+					Log.d(TAG, "Disabled ads because specified account found");
+					Toast.makeText(getApplicationContext(), "Disabled Ads for Marco :-)", Toast.LENGTH_SHORT).show();
+					return;
+				}
+			}*/
+			Log.i(TAG, "Ad Status: Enabled");
+
+			Log.d(TAG, "No special accounts found");
+			//Appodeal.setTesting(true);
+			//Appodeal.setAutoCache(Appodeal.INTERSTITIAL, false);
+			Appodeal.initialize((DBMain) mContext, appKey, Appodeal.INTERSTITIAL);
+			//Appodeal.cache((DBMain)mContext, Appodeal.INTERSTITIAL);
+		}
+	}
+
+	@SuppressLint("ClickableViewAccessibility")
+	private void initViews() {
+		mFrameLayout = (FrameLayout)findViewById(R.id.mFrame);
+		mSurfaceView = (DBGLSurfaceView)findViewById(R.id.mSurf);
+		//mJoystickView = (JoystickView)findViewById(R.id.mJoystickView);
+		mButtonsView = (LinearLayout)findViewById(R.id.ButtonLayout);
+
 		bButtonA = (Button)findViewById(R.id.ButtonA);
 		bButtonB = (Button)findViewById(R.id.ButtonB);
 		bButtonC = (Button)findViewById(R.id.ButtonC);
 		bButtonD = (Button)findViewById(R.id.ButtonD);
+		bPortraitScale = (Button) findViewById(R.id.ButtonPortraitScale);
+		bShowKeyboard = (Button) findViewById(R.id.ButtonShowKeyboard);
+
+		spaceSeekBar = (SeekBar) findViewById(R.id.seekbar_space);
+
+		hideControls();
+		final LinearLayout vButtonHolder = (LinearLayout) findViewById(R.id.vertical_button_holder);
+		spaceSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+			@Override
+			public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+				float percent = (float) progress / 100.0f;
+				LinearLayout.LayoutParams param1 = (LinearLayout.LayoutParams) vButtonHolder.getLayoutParams();
+				param1.weight = 1.0f - percent;
+				vButtonHolder.setLayoutParams(param1);
+				LinearLayout.LayoutParams param2 = (LinearLayout.LayoutParams) bButtonC.getLayoutParams();
+				param2.weight = percent;
+				bButtonC.setLayoutParams(param2);
+				//Log.d(TAG, "percent: " + percent);
+			}
+
+			@Override
+			public void onStartTrackingTouch(SeekBar seekBar) {
+
+			}
+
+			@Override
+			public void onStopTrackingTouch(SeekBar seekBar) {
+				float percent = (float) seekBar.getProgress() / 100.0f;
+				Log.d(TAG, "Saving controlspace percent: " + percent);
+				prefs.edit().putInt("controlspace", seekBar.getProgress()).apply();
+				mSurfaceView.controlSpace = percent;
+			}
+		});
+
+		bButtonB.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View view) {
+            	// press enter and f2 key
+				Log.i(TAG, "Restart button pressed (in UI)");
+				AlertDialog.Builder builder = new AlertDialog.Builder(mContext);
+
+				//builder.setTitle("Save");
+				builder.setMessage("Save Game Score Permanently?");
+
+				builder.setPositiveButton("YES", new DialogInterface.OnClickListener() {
+
+					public void onClick(DialogInterface dialog, int which) {
+						if (Appodeal.isLoaded(Appodeal.INTERSTITIAL)) {
+							playingAd = true;
+							startupAd = true; // dont pause dosbox
+							Toast.makeText((DBMain) mContext, "Saving Game in Background...", Toast.LENGTH_SHORT).show();
+							Appodeal.show((DBMain) mContext, Appodeal.INTERSTITIAL);
+						}
+						// Do nothing but close the dialog
+						DosBoxControl.nativeTableEvent(0);
+						DosBoxControl.nativeTableEvent(2);
+
+						Handler handler = new Handler();
+						handler.postDelayed(new Runnable() {
+							@Override
+							public void run() {
+								DosBoxControl.nativeTableEvent(0);
+								Handler handler = new Handler();
+								handler.postDelayed(new Runnable() {
+									@Override
+									public void run() {
+										DosBoxControl.nativeTableEvent(0);
+									}
+								}, 500);
+							}
+						}, 500);
+						dialog.dismiss();
+					}
+				});
+
+				builder.setNegativeButton("NO", new DialogInterface.OnClickListener() {
+
+					@Override
+					public void onClick(DialogInterface dialog, int which) {
+						if (Appodeal.isLoaded(Appodeal.INTERSTITIAL)) {
+							playingAd = true;
+							startupAd = true; // dont pause dosbox
+							Toast.makeText((DBMain) mContext, "Saving Game in Background...", Toast.LENGTH_SHORT).show();
+							Appodeal.show((DBMain) mContext, Appodeal.INTERSTITIAL);
+						}
+						DosBoxControl.nativeTableEvent(0);
+						// Do nothing
+						dialog.dismiss();
+					}
+				});
+
+				AlertDialog alert = builder.create();
+				alert.show();
+            }
+        });
+
+		bPortraitScale.setOnClickListener(new OnClickListener() {
+
+			@Override
+			public void onClick(View v) {
+				boolean scaleState = DBMenuSystem.getBooleanPreference(mContext, "confscale");
+				scaleState = !scaleState;
+				DBMenuSystem.saveBooleanPreference(mContext, "confscale", scaleState);
+				mSurfaceView.mScale = scaleState;
+				mSurfaceView.setDirty();
+
+				if (scaleState) {
+				    Toast.makeText(mContext, "Max scaling: ON", Toast.LENGTH_SHORT).show();
+				    bPortraitScale.setText("-");
+                }
+                else {
+					Toast.makeText(mContext, "Max scaling: OFF", Toast.LENGTH_SHORT).show();
+					bPortraitScale.setText("+");
+				}
+              }
+		});
+
+		bShowKeyboard.setOnClickListener(new OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+				if (imm != null) {
+					if (!showingKeyboard) {
+						imm.toggleSoftInput(InputMethodManager.SHOW_FORCED, InputMethodManager.HIDE_IMPLICIT_ONLY);
+						showingKeyboard = true;
+					}
+					else {
+						imm.hideSoftInputFromWindow(mSurfaceView.getWindowToken(), 0);
+						showingKeyboard = false;
+					}
+				}
+			}
+		});
+	}
+
+	public void showControls() {
+		spaceSeekBar.setVisibility(View.VISIBLE);
+		mButtonsView.setVisibility(View.VISIBLE);
+		showingControls = true;
+	}
+
+	public void hideControls() {
+		spaceSeekBar.setVisibility(View.GONE);
+		mButtonsView.setVisibility(View.GONE);
+		showingControls = false;
+	}
+
+	@Override
+	public boolean onKeyUp(int keyCode, KeyEvent event) {
+		DosBoxControl.nativeKeyboardStroke(keyCode, 1, 0, 0, keyCode >= 'A' && keyCode <= 'Z'? 1 : 0);
+		DosBoxControl.nativeKeyboardStroke(keyCode, 0, 0, 0, keyCode >= 'A' && keyCode <= 'Z'? 1 : 0);
+		return false;
+	}
+
+	@Override
+	public boolean onKeyDown(int keyCode, KeyEvent event) {
+		if (event.getAction() == KeyEvent.ACTION_DOWN) {
+			switch (keyCode) {
+				case KeyEvent.KEYCODE_BACK:
+					if (showingControls) {
+						hideControls();
+					}
+					break;
+			}
+		}
+		return false;
 	}
 
 	@Override
 	protected void onDestroy() {
-		Log.i("DosBoxTurbo", "onDestroy()");
-		stopDosBox();
-		shutDownDosBox();
-		mSurfaceView.shutDown();
-		mSurfaceView = null;
+		Log.i(TAG, "onDestroy()");
+		if (mDosBoxThread != null && mSurfaceView != null) {
+			stopDosBox();
+			shutDownDosBox();
+			mSurfaceView.shutDown();
+			mSurfaceView = null;
+		}
 		super.onDestroy();
 	}
 
 	@Override
 	protected void onPause() {
-		Log.i("DosBoxTurbo","onPause()");
-		pauseDosBox(true);
+		Log.i(TAG,"onPause()");
+
+		if (!permissionsOk) {
+            Log.e(TAG, "PERMISSIONS NOT OK!!");
+            super.onPause();
+			return;
+		}
+
+		if (showingKeyboard) {
+			InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+			if (imm != null && showingKeyboard) {
+				imm.hideSoftInputFromWindow(mSurfaceView.getWindowToken(), 0);
+				showingKeyboard = false;
+			}
+		}
+
+		if (startupAd) {
+			pauseDosBox(false);
+			startupAd = false;
+			Log.i(TAG, "Setting startup ad to false (Not pausing Dosbox)");
+		} else {
+			pauseDosBox(true);
+		}
 		super.onPause();
 	}
 
 	@Override
 	protected void onStop() {
-		Log.i("DosBoxTurbo","onStop()");
+		Log.i(TAG,"onStop()");
+		//onPause();
 		super.onStop();
 	}
 
+	public boolean startupAd = true;
+	public boolean playingAd = false;
+
 	@Override
 	protected void onResume() {
-		Log.i("DosBoxTurbo","onResume()");
+		if (!permissionsOk) {
+		    Log.e(TAG, "PERMISSIONS NOT OK!");
+			super.onResume();
+			return;
+		}
+
+		Log.i(TAG,"onResume()");
 		super.onResume();
 		pauseDosBox(false);
 
-		DBMenuSystem.loadPreference(this,prefs);
+		if (mSurfaceView != null)
+			DBMenuSystem.loadPreference(this,prefs);
+
+		if (Appodeal.isLoaded(Appodeal.INTERSTITIAL) && !playingAd) {
+			Log.i(TAG, "Showing interstetial ad in Resume()");
+			playingAd = true;
+			Appodeal.show(this, Appodeal.INTERSTITIAL);
+		}
+		else if (playingAd)
+			playingAd = false;
 
 		// set rotation
-		if (Integer.valueOf(prefs.getString("confrotation", "0"))==0) {
+		/*if (Integer.valueOf(prefs.getString("confrotation", "0"))==0) {
 			// auto
 	        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR);
 		} else if (Integer.valueOf(prefs.getString("confrotation", "0"))==1) {
@@ -316,180 +732,53 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 	        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 		} else {
 	        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
-		}
-
-		// check for developer option "dont keep activities"
-		int value = Settings.System.getInt(getContentResolver(), Settings.System.ALWAYS_FINISH_ACTIVITIES, 0);
-		if (value != 0) {
-			// Dont Keep Activities is enabled
-			Toast.makeText(this, R.string.dontkeepactivities, Toast.LENGTH_SHORT).show();
-		} else {
-
-			if (mTurboOn) {
-				Toast.makeText(this, R.string.fastforward, Toast.LENGTH_SHORT).show();
-			} else {
-				if (DosBoxControl.nativeGetAutoAdjust()) {
-					Toast.makeText(this, "Auto Cycles ["+DosBoxControl.nativeGetCycleCount() +"%]", Toast.LENGTH_SHORT).show();
-				} else {
-					Toast.makeText(this, "DosBox Cycles: "+DosBoxControl.nativeGetCycleCount(), Toast.LENGTH_SHORT).show();
-				}
-			}
-		}
+		}*/
 
 		// check orientation to hide actionbar (in landscape)
 		if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
-			getSupportActionBar().hide();
+			enableActionBar(false);
 		}
-        // handle virtual buttons (top or bottom location)
-        if (mButtonsView.isShown()) {
-        	FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
-                LayoutParams.FILL_PARENT, LayoutParams.WRAP_CONTENT);
-        	if (Integer.valueOf(prefs.getString("confbuttonlocation", "1"))==1) {
-        		// bottom
-        		mButtonsView.setGravity(Gravity.BOTTOM);
-        		params.gravity=Gravity.BOTTOM;
-        		params.topMargin=0;
-        	} else {
-        		mButtonsView.setGravity(Gravity.TOP);
-        		params.gravity=Gravity.TOP;
-        		if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
-        			params.topMargin=0;
-        		} else {
-        			params.topMargin=mSurfaceView.mActionBarHeight;
-        		}
-        	}
-        	mButtonsView.setLayoutParams(params);
-        }
-
-		// fill quickmenu
-		quickmenu();
-    	mSurfaceView.mDirty.set(true);
-		Log.i("DosBoxTurbo","onResume");
+		if (mSurfaceView != null)
+    		mSurfaceView.mDirty.set(true);
+        Log.i(TAG,"onResume");
 	}
-
-	@SuppressLint("NewApi")
-	private void quickmenu() {
-		// DosBox Cycles
-
-		if (DosBoxControl.nativeGetAutoAdjust()) {
-			iCycles.setText(R.string.auto);
-		} else {
-			iCycles.setText(String.valueOf(DosBoxControl.nativeGetCycleCount()));
-		}
-		iFrameSkip.setText(String.valueOf(DosBoxControl.nativeGetFrameSkipCount()));
-		iCPUNeon.setText(R.string.no);
-		switch(nativeGetCPUFamily()) {
-		case 2:	// X86 CPU detected
-			iCPUFamily.setText("x86");
-			break;
-		case 3: // MIPS CPU detected
-			iCPUFamily.setText("MIPS");
-			break;
-		case 0:	// Unknown -- try ARM
-		default:	// ARM Family
-			if (nativeHasNEON(mDosBoxLauncher) && (Integer.valueOf(prefs.getString("confoptimization", "2")) >= 2) ) {
-				iCPUNeon.setText(R.string.yes);
-				iCPUFamily.setText("ARMv7a");
-			} else if (nativeIsARMv7(mDosBoxLauncher) && (Integer.valueOf(prefs.getString("confoptimization", "2")) >= 1) ) {
-				iCPUFamily.setText("ARMv7a");
-			} else {
-				iCPUFamily.setText("ARMv5");
-			}
-		}
-
-		if (mSurfaceView.mGPURendering) {
-			iRenderMode.setText("OpenGL");
-		} else {
-			iRenderMode.setText("Canvas");
-		}
-		try {
-			iDBManager.setText(getPackageManager().getPackageInfo("com.fishstix.dosboxlauncher", 0).versionName);
-		} catch (NameNotFoundException e1) {
-			iDBManager.setText(R.string.notinstalled);
-		}
-		try {
-			iVersion.setText(getPackageManager().getPackageInfo(getPackageName(), 0).versionName);
-		} catch (NameNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		iDOSMem.setText(String.valueOf(DosBoxControl.nativeGetMemSize())+"MB");
-		switch(mSurfaceView.mInputMode) {
-		case DBGLSurfaceView.INPUT_MODE_MOUSE:
-			iInputMode.setText(R.string.input_touchscreen);
-			break;
-		case DBGLSurfaceView.INPUT_MODE_REAL_MOUSE:
-			iInputMode.setText(R.string.input_mouse);
-			break;
-		case DBGLSurfaceView.INPUT_MODE_REAL_JOYSTICK:
-			iInputMode.setText(R.string.input_joystick);
-			break;
-		case DBGLSurfaceView.INPUT_MODE_SCROLL:
-			iInputMode.setText(R.string.input_scroll);
-			break;
-		}
-		if (mSurfaceView.mAbsolute) {
-			iTracking.setText("Absolute");
-		} else {
-			iTracking.setText("Relative");
-		}
-		iGovernor.setText(ReadCPUgovernor());
-
-		bJoystick.setChecked(DBMenuSystem.getBooleanPreference(mContext,"confjoyoverlay"));
-		bScaling.setChecked(DBMenuSystem.getBooleanPreference(mContext,"confscale"));
-		bButtons.setChecked(DBMenuSystem.getBooleanPreference(mContext, "confbuttonoverlay"));
-
-	}
-
-	private String ReadCPUgovernor()
-	 {
-	  ProcessBuilder cmd;
-	  String result="";
-
-	  try{
-	   String[] args = {"/system/bin/cat", "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"};
-	   cmd = new ProcessBuilder(args);
-
-	   Process process = cmd.start();
-	   InputStream in = process.getInputStream();
-	   byte[] re = new byte[1024];
-	   while(in.read(re) != -1){
-	    //System.out.println(new String(re));
-	    result = result + new String(re);
-	   }
-	   in.close();
-	  } catch(IOException ex){
-	   ex.printStackTrace();
-	   result = "unknown";
-	  }
-	  if (result.length() == 0) {
-		  result = "unknown";
-	  }
-	  if (result.toLowerCase(Locale.ENGLISH).contains("performance") || result.toLowerCase(Locale.ENGLISH).contains("interactive")) {
-		  imgGovWarning.setVisibility(View.INVISIBLE);
-	  } else {
-		  imgGovWarning.setVisibility(View.VISIBLE);
-	  }
-	  return result;
-	 }
 
 	@Override
 	public void onConfigurationChanged(Configuration newConfig) {
 	    super.onConfigurationChanged(newConfig);
-	    Log.i("DosBoxTurbo","Config Change");
-	    Display display = ((WindowManager) getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay();
+	    Log.i(TAG,"Config Change");
+	 //   Display display = ((WindowManager) getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay();
 	    if (newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE) //To fullscreen
-	    {
-	    	getSupportActionBar().hide();
-	    }
+		{
+			enableActionBar(false);
+			if (mSurfaceView != null)
+            	mSurfaceView.updateScreenWidth(false);
+			if (bPortraitScale != null)
+				bPortraitScale.setVisibility(View.GONE);
+		}
 	    else if (newConfig.orientation == Configuration.ORIENTATION_PORTRAIT)
 	    {
-	    	getSupportActionBar().show();
+			enableActionBar(true);
+			if (mSurfaceView != null)
+            	mSurfaceView.updateScreenWidth(true);
+			if (bPortraitScale != null)
+				bPortraitScale.setVisibility(View.VISIBLE);
 	    }
+	}
 
-		// FIXME
- 	    // getSlidingMenu().setBehindOffset((int) (display.getWidth()/4.0d));
-		// getSlidingMenu().requestLayout();
+	public void enableActionBar(boolean enabled) {
+		if (enabled) {
+			if (getSupportActionBar() != null)
+				getSupportActionBar().show();
+			else if (getActionBar() != null)
+				getActionBar().show();
+		}
+		else {
+			if (getSupportActionBar() != null)
+				getSupportActionBar().hide();
+			else if (getActionBar() != null)
+				getActionBar().hide();
+		}
 	}
 
 	@Override
@@ -507,12 +796,6 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 
 	@Override
 	public boolean onOptionsItemSelected(MenuItem item)	{
-		switch (item.getItemId()) {
-		case android.R.id.home:
-			// FIXME
-			// toggle();
-			return true;
-		}
 		if (DBMenuSystem.doOptionsItemSelected(this, item))
 			return true;
 	    return super.onOptionsItemSelected(item);
@@ -521,17 +804,14 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 	@Override
 	public void onCreateContextMenu(ContextMenu menu, View v, ContextMenu.ContextMenuInfo menuInfo) {
 		  super.onCreateContextMenu(menu, v, menuInfo);
-		  DBMenuSystem.doCreateContextMenu(this, menu, v, menuInfo);
+		 // DBMenuSystem.doCreateContextMenu(this, menu, v, menuInfo);
 	}
 
-	@Override
-	public boolean onContextItemSelected(android.view.MenuItem item) {
-		if (DBMenuSystem.doContextItemSelected(this, item))
-			return true;
-	    return super.onOptionsItemSelected(item);
-	}
 
 	void pauseDosBox(boolean pause) {
+		if (mDosBoxThread == null)
+			return;
+
 		if (pause) {
 			mDosBoxThread.mDosBoxRunning = false;
 
@@ -548,8 +828,27 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 		}
 	}
 
+
+	public void initStartDosBox() {
+		initDosBox();
+
+		(new Handler()).postDelayed(new Runnable() {
+			@Override
+			public void run() {
+				startDosBox();
+			}
+		}, 2000);
+
+		(new Handler()).postDelayed(new Runnable() {
+			@Override
+			public void run() {
+			}
+		}, 2000);
+	}
+
 	void initDosBox() {
-		mAudioDevice = new DosBoxAudio(this);
+
+        mAudioDevice = new DosBoxAudio(this);
 
 		nativeInit(mDosBoxLauncher);
 
@@ -559,7 +858,11 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 			argStartCommand = "";
 		}
 
-		nativeSetOption(DBMenuSystem.DOSBOX_OPTION_ID_START_COMMAND, 0, argStartCommand, true);
+		String cmd =    "mount c: " + DosHDD.hddLocation() + " -freesize 128\n" +
+				"c:\n" +
+				"cadet\n";
+
+		nativeSetOption(DBMenuSystem.DOSBOX_OPTION_ID_START_COMMAND, 0, cmd, true);
 		nativeSetOption(DBMenuSystem.DOSBOX_OPTION_ID_MIXER_HACK_ON, (mPrefMixerHackOn)?1:0,null, true);
 		nativeSetOption(DBMenuSystem.DOSBOX_OPTION_ID_SOUND_MODULE_ON, (mPrefSoundModuleOn)?1:0,null, true);
 
@@ -587,24 +890,42 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 	}
 
 	void startDosBox() {
-		if (mDosBoxThread != null)
-			mDosBoxThread.start();
 
-		if ((mSurfaceView != null) && (mSurfaceView.mVideoThread != null))
-			mSurfaceView.mVideoThread.start();
+		if (mDosBoxThread != null) {
+			mDosBoxThread.setPriority(Thread.MAX_PRIORITY);
+			if (mDosBoxThread.getState() == Thread.State.NEW)
+				mDosBoxThread.start();
+		}
+
+		if ((mSurfaceView != null) && (mSurfaceView.mVideoThread != null)) {
+			if (mSurfaceView.mVideoThread.getState() == Thread.State.NEW)
+				mSurfaceView.mVideoThread.start();
+		}
+
 	}
 
 	void stopDosBox() {
-		nativePause(0);//it won't die if not running
+		DosBoxControl.nativeTableEvent(2);
 
-		//stop audio AFTER above
-		if (mAudioDevice != null)
-			mAudioDevice.pause();
+		Handler handler = new Handler();
+		handler.postDelayed(new Runnable() {
+			@Override
+			public void run() {
+				nativePause(0);//it won't die if not running
 
-		mSurfaceView.mVideoThread.setRunning(false);
-		mSurfaceView.mMouseThread.setRunning(false);
+				//stop audio AFTER above
+				if (mAudioDevice != null)
+					mAudioDevice.pause();
 
-		nativeStop();
+				if (mSurfaceView != null && mSurfaceView.mVideoThread != null)
+					mSurfaceView.mVideoThread.setRunning(false);
+				//mSurfaceView.mMouseThread.setRunning(false);
+
+				nativeStop();
+
+				System.exit(0);
+			}
+		}, 2000);
 	}
 
 	public void callbackExit() {
@@ -694,7 +1015,7 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 
 		public void run() {
 			mDosBoxRunning = true;
-			Log.i("DosBoxTurbo", "Using DosBox Config: "+mConfPath+mConfFile);
+			Log.i(TAG, "Using DosBox Config: "+mConfPath+mConfFile);
 			nativeStart(mDosBoxLauncher, mSurfaceView.mBitmap, mSurfaceView.mBitmap.getWidth(), mSurfaceView.mBitmap.getHeight(), mConfPath+mConfFile);
 			//will never return to here;
 		}
@@ -710,209 +1031,5 @@ public class DBMain extends AppCompatActivity implements OnClickListener, OnChec
 			mDosBoxRunning = false;
 			mParent.finish();
 		}
-	}
-
-	public Handler mHandler = new Handler() {
-		@Override
-		public void handleMessage(Message msg) {
-			switch (msg.what) {
-			case HANDLER_ADD_JOYSTICK:
-				mJoystickView.setOnJostickMovedListener(mSurfaceView._listener);
-				mJoystickView.setOnJostickClickedListener(mSurfaceView._buttonlistener);
-				mJoystickView.setVisibility(View.VISIBLE);
-				if (!bJoystick.isChecked()) {
-					bJoystick.setChecked(true);
-				}
-
-				DBMenuSystem.saveBooleanPreference(mContext,"confjoyoverlay",true);
-
-				break;
-			case HANDLER_REMOVE_JOYSTICK:
-				mJoystickView.setOnJostickMovedListener(null);
-				mJoystickView.setOnJostickClickedListener(null);
-				mJoystickView.setVisibility(View.GONE);
-				if (bJoystick.isChecked()) {
-					bJoystick.setChecked(false);
-				}
-
-				DBMenuSystem.saveBooleanPreference(mContext,"confjoyoverlay",false);
-				break;
-			case HANDLER_ADD_BUTTONS:
-				FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
-		                LayoutParams.FILL_PARENT, LayoutParams.WRAP_CONTENT);
-				if (Integer.valueOf(prefs.getString("confbuttonlocation", "1"))==1) {
-					// bottom
-					mButtonsView.setGravity(Gravity.BOTTOM);
-			        params.gravity=Gravity.BOTTOM;
-			        params.topMargin=0;
-				} else {
-					mButtonsView.setGravity(Gravity.TOP);
-			        params.gravity=Gravity.TOP;
-			        if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
-			        	params.topMargin=0;
-			        } else {
-			        	params.topMargin=mSurfaceView.mActionBarHeight;
-			        }
-				}
-		        mButtonsView.setLayoutParams(params);
-				mButtonsView.setVisibility(View.VISIBLE);
-				if (!bButtons.isChecked()) {
-					bButtons.setChecked(true);
-				}
-				DBMenuSystem.saveBooleanPreference(mContext,"confbuttonoverlay",true);
-				break;
-			case HANDLER_REMOVE_BUTTONS:
-				mButtonsView.setVisibility(View.GONE);
-				mButtonsView.setOnTouchListener(null);
-				if (bButtons.isChecked()) {
-					bButtons.setChecked(false);
-				}
-				DBMenuSystem.saveBooleanPreference(mContext,"confbuttonoverlay",false);
-				break;
-			case HANDLER_SEND_KEYCODE:
-				if (msg.arg1 == 0) {
-					mSurfaceView.onKeyDown(msg.arg2, (KeyEvent)msg.obj);
-				} else {
-					mSurfaceView.onKeyUp(msg.arg2, (KeyEvent)msg.obj);
-				}
-				break;
-			case HANDLER_DISABLE_GPU:
-				DBMenuSystem.saveBooleanPreference(mContext, "confgpu", false);
-				Toast.makeText(mDosBoxLauncher,msg.getData().getString("msg") , Toast.LENGTH_LONG).show();
-				break;
-			default:
-				Toast.makeText(mDosBoxLauncher,msg.getData().getString("msg") , Toast.LENGTH_LONG).show();
-			    //do something in the user interface to display data from message
-			}
-	  	}
-	};
-
-	@Override
-	public void onClick(View v) {
-		List<Integer> ids = Arrays.asList(
-				R.id.tableRow_Cycles,
-				R.id.tableRow_FrameSkip,
-				R.id.tableRow_SpecialKeys,
-				R.id.tableRow_Tracking,
-				R.id.tableRow_InputMode,
-				R.id.tableRow_Settings
-		);
-
-		// Handle info/quickMenu
-		switch (ids.indexOf(v.getId())) {
-		case 0:
-			mSurfaceView.mContextMenu = DBMenuSystem.CONTEXT_MENU_CYCLES;
-			openContextMenu(mSurfaceView);
-		break;
-		case 1:
-			mSurfaceView.mContextMenu = DBMenuSystem.CONTEXT_MENU_FRAMESKIP;
-			openContextMenu(mSurfaceView);
-		break;
-		case 2:
-			mSurfaceView.mContextMenu = DBMenuSystem.CONTEXT_MENU_SPECIAL_KEYS;
-			openContextMenu(mSurfaceView);
-		break;
-		case 3:
-			mSurfaceView.mContextMenu = DBMenuSystem.CONTEXT_MENU_TRACKING;
-			openContextMenu(mSurfaceView);
-		break;
-		case 4:
-			mSurfaceView.mContextMenu = DBMenuSystem.CONTEXT_MENU_INPUTMODE;
-			openContextMenu(mSurfaceView);
-		break;
-		case 5:
-			Intent i = new Intent(mContext, DosBoxPreferences.class);
-			startActivity(i);
-		break;
-		}
-	}
-
-	@Override
-	public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-		List<Integer> ids = Arrays.asList(
-				R.id.info_kbdoption,
-				R.id.info_joyoption,
-				R.id.info_scaleoption,
-				R.id.info_buttonsoption
-		);
-
-		switch(ids.indexOf(buttonView.getId())) {
-		case 0:
-			if (isChecked) {
-				if (!mSurfaceView.mKeyboardVisible) {
-					bKeyboard.setOnCheckedChangeListener(null);
-					bKeyboard.setChecked(false);
-					DBMenuSystem.doShowKeyboard(this);
-					bKeyboard.setOnCheckedChangeListener(this);
-				}
-			} else {
-				if (mSurfaceView.mKeyboardVisible)
-					DBMenuSystem.doHideKeyboard(this);
-			}
-		break;
-		case 1:
-			if (isChecked) {
-				mHandler.sendMessage(mHandler.obtainMessage(DBMain.HANDLER_ADD_JOYSTICK,0,0));
-			} else {
-				mHandler.sendMessage(mHandler.obtainMessage(DBMain.HANDLER_REMOVE_JOYSTICK,0,0));
-			}
-		break;
-		case 2:
-			if (isChecked != mSurfaceView.mScale) {
-				mSurfaceView.mScale = isChecked;
-				DBMenuSystem.saveBooleanPreference(getApplicationContext(), "confscale",mSurfaceView.mScale);
-				mSurfaceView.forceRedraw();
-			}
-		break;
-		case 3:
-			if (isChecked) {
-				mHandler.sendMessage(mHandler.obtainMessage(DBMain.HANDLER_ADD_BUTTONS,0,0));
-			} else {
-				mHandler.sendMessage(mHandler.obtainMessage(DBMain.HANDLER_REMOVE_BUTTONS,0,0));
-			}
-		break;
-		}
-	}
-
-	public boolean getMIDIRoms() {
-		File ctrlrom = new File(getFilesDir().toString() +"/MT32_CONTROL.ROM");
-		File pcmrom = new File(getFilesDir().toString() +"/MT32_PCM.ROM");
-
-		File romdir = getExternalFilesDir(null);
-		//File rom = null;
-		if (romdir != null) {
-			for (File f : romdir.listFiles()) {
-				if (f.getName().equalsIgnoreCase("MT32_CONTROL.ROM")) {
-					// found ROM
-					ctrlrom = f;
-				}
-				if (f.getName().equalsIgnoreCase("MT32_PCM.ROM")) {
-					// found ROM
-					pcmrom = f;
-				}
-			}
-		}
-		if (!ctrlrom.exists() || !pcmrom.exists()) {
-			ctrlrom = DBMenuSystem.openFile(DosBoxPreferences.getExternalDosBoxDir(mContext)+"MT32_CONTROL.ROM");
-			pcmrom = DBMenuSystem.openFile(DosBoxPreferences.getExternalDosBoxDir(mContext)+"MT32_PCM.ROM");
-			romdir = DBMenuSystem.openFile(DosBoxPreferences.getExternalDosBoxDir(mContext));
-			for (File f : romdir.listFiles()) {
-				if (f.getName().equalsIgnoreCase("MT32_CONTROL.ROM")) {
-					// found ROM
-					ctrlrom = f;
-				}
-				if (f.getName().equalsIgnoreCase("MT32_PCM.ROM")) {
-					// found ROM
-					pcmrom = f;
-				}
-			}
-		}
-		if (ctrlrom.exists() && pcmrom.exists()) {
-			DBMenuSystem.CopyROM(this, ctrlrom);
-			DBMenuSystem.CopyROM(this,pcmrom);
-			return true;
-		}
-
-		return false;
 	}
 }

@@ -12,7 +12,7 @@ LOCAL_PATH := $(abspath $(LOCAL_PATH))
 CG_SRCDIR := $(LOCAL_PATH)
 LOCAL_CFLAGS :=	-I$(LOCAL_PATH)/include \
 				$(foreach D, $(CG_SUBDIRS), -I$(CG_SRCDIR)/$(D)) \
-				-I$(LOCAL_PATH)/../sdl/include \
+				-I$(LOCAL_PATH)/../sdl2/include \
 				-I$(LOCAL_PATH)/../dosbox \
 				-I$(LOCAL_PATH)/../dosbox/include \
 				-I$(LOCAL_PATH)/../dosbox/src \
@@ -28,7 +28,7 @@ LOCAL_ARM_MODE := arm
 
 LOCAL_CPPFLAGS := $(LOCAL_CFLAGS)
 LOCAL_CXXFLAGS := $(LOCAL_CFLAGS)
-LOCAL_STATIC_LIBRARIES := fishstix_al dosbox_main
+LOCAL_STATIC_LIBRARIES := fishstix_al dosbox_main SDL2
 LOCAL_LDLIBS += -llog -ljnigraphics 
 
 

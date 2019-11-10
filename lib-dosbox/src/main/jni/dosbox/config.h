@@ -77,11 +77,11 @@
 
 // Uncomment if your Android device supports NEON
 /* Enable NEON Performance Optimizations */
-/* #define HAVE_NEON 1 */
+ //#define HAVE_NEON 1
 
 // Uncomment if your Android device supports NEON
 /* Enable NEON Memory Optimizations */
-/* #define NEON_MEMORY 1 */
+//#define NEON_MEMORY 1
 
 /* Define to 1 to use opengl display output support */
 #define C_OPENGL 0

@@ -43,6 +43,16 @@
 #include "render.h"
 //#include "pci_bus.h"
 
+#include <android/log.h>
+
+#define  LOG_TAG    "DosBoxTurbo"
+
+#define  LOGE(...)  __android_log_print(ANDROID_LOG_ERROR,LOG_TAG,__VA_ARGS__)
+#define  LOGW(...)  __android_log_print(ANDROID_LOG_WARN,LOG_TAG,__VA_ARGS__)
+#define  LOGD(...)  __android_log_print(ANDROID_LOG_DEBUG,LOG_TAG,__VA_ARGS__)
+#define  LOGI(...)  __android_log_print(ANDROID_LOG_INFO,LOG_TAG,__VA_ARGS__)
+
+
 #ifdef C_NE2000
 //#include "ne2000.h"
 void NE2K_Init(Section* sec);
@@ -158,12 +168,15 @@ static Bitu Normal_Loop(void) {
 			if (DEBUG_ExitLoop()) return 0;
 #endif
 		} else {
-			GFX_Events();
+		    //if (loadf == 0)
+              //  goto skip_loadf;
+			GFX_Events();       // TODO: CRASH 2 HERE
 			//locnet, abort current program without exception
-			if (loadf->abort == 1) {
+			if (loadf != 0 && loadf->abort == 1) {
 				loadf->abort = 2;
 				return 1;
 			}
+skip_loadf:
 			if (ticksRemain>0) {
 				TIMER_AddTick();
 				ticksRemain--;
@@ -357,6 +370,7 @@ static void DOSBOX_RealInit(Section * sec) {
 extern bool	enableGlide; // fishstix
 
 void DOSBOX_Init(void) {
+	LOGD( "INITED DOSBOX FROM JNI");
 	Section_prop * secprop;
 	Section_line * secline;
 	Prop_int* Pint;

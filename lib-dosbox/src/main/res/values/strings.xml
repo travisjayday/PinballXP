@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">FreeBox</string>
+    <string name="app_name">Pinball XP</string>
     <string name="debug">WARNING: DEBUG Mode is Enabled</string>
     <string name="info_slider">Information</string>
     <string name="settings_slider">Settings</string>
@@ -10,13 +10,18 @@
     <string name="menu_specialkeys">Special Keys</string>
     <string name="menu_settings">Settings</string>
     <string name="menu_exit">Exit</string>
+	<string name="menu_boost">Toggle Performance Boost</string>
+	<string name="menu_ingame_music">Toggle in-game Music</string>
+	<string name="menu_ingame_sound">Toggle Sound</string>
+	<string name="menu_highscore">Show Highscores</string>
+	<string name="menu_remove_ads">Remove Ads</string>
     
     <string name="input_touchscreen">Touchscreen</string>
     <string name="input_joystick">Joystick</string>
     <string name="input_mouse">Mouse/Stylus</string>
     <string name="input_scroll">Scroll Screen</string>
     
-    <string name="info_dbquickmenu">DosBox QuickMenu</string>
+    <string name="info_dbquickmenu">Pinball QuickMenu</string>
     <string name="info_cycles">Cycles:</string>
     <string name="info_frameskip">FrameSkip:</string>
     <string name="info_inputmode">Input Mode:</string>
@@ -45,10 +50,10 @@
     <string name="no">No</string>
 
     <string name="restart">Restart for changes to take effect</string>
-    <string name="manual">Manually edit /sdcard/dosbox.conf to set configuration</string>
+    <string name="manual">Manually edit /sdcard/Pinball.conf to set configuration</string>
     <string name="error">An unknown error occurred</string>
     <string name="cont">Continue</string>
-    <string name="cycles">DosBox Cycles: </string>
+    <string name="cycles">Pinball Cycles: </string>
     <string name="select_dos_key">Select DOS Key Mapping</string>
     <string name="select_controller_key">Press Hardware Key or select Virtual Button:</string>
     <string name="select_analog_stick">Move the analog stick in all directions</string>
@@ -66,28 +71,28 @@
 	<string name="glidenogpu">GPU Rendering not compatible with experimental Glide emulation.</string>
 	
 	<!-- Preferences -->
-	<string name="pref_advconfig">Advanced DosBox Config</string>
-	<string name="pref_dbsettings">DosBox Settings</string>
+	<string name="pref_advconfig">Advanced Pinball Config</string>
+	<string name="pref_dbsettings">Pinball Settings</string>
 	<string name="pref_memtitle">Memory Size</string>
 	<string name="pref_memsum">Set the amount of memory available to DOS</string>
 	<string name="pref_frameskip">Set the FrameSkip amount</string>
-	<string name="pref_cycles">DosBox Cycles (setting too high may cause lag)</string>
-	<string name="pref_machine">DosBox Machine Emulation Setting</string>
-	<string name="pref_cpucore">DosBox CPU Core Setting</string>
-	<string name="pref_cputype">DosBox CPU Type Setting</string>
+	<string name="pref_cycles">Pinball Cycles (setting too high may cause lag)</string>
+	<string name="pref_machine">Pinball Machine Emulation Setting</string>
+	<string name="pref_cpucore">Pinball CPU Core Setting</string>
+	<string name="pref_cputype">Pinball CPU Type Setting</string>
 	<string name="pref_sbtype">Choose Soundblaster Emulation</string>
 	<string name="pref_sbrate">Choose the Audio Sample Rate/Quality</string>
 	<string name="pref_mixerblocksize">Audio Mixer Blocksize (larger values may reduce skipping)</string>
 	<string name="pref_mixerprebuffer">Audio Mixer Pre-Buffer (larger values may reduce skipping)</string>
 	<string name="pref_kblayout">Choose the Locale for the Keyboard Layout</string>
-	<string name="pref_manualconf_file">Choose name/location of the dosbox config file</string>
+	<string name="pref_manualconf_file">Choose name/location of the Pinball config file</string>
 	<string name="pref_editconf_file">Edit with system text editor (if installed)</string>
 	
 	<string name="pref_mousejoymode">Use Joystick to control Mouse Pointer</string>
 <!--    <string name="absdefault">Absolute Tracking Calibration Reset</string>
     <string name="abscalibrate">Tap visible DOS pointer to calibrate</string>
     <string name="abscalibrate_success">Mouse Pointer Calibrated</string> -->
-    <!--  DOSBOX SETTINGS  -->
+    <!--  Pinball SETTINGS  -->
     <string-array name="dosmemsize">
   		<item>1 MB</item>
   		<item>2 MB</item>

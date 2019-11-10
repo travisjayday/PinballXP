@@ -176,7 +176,7 @@ void getKeyFromUnicode(int unicode, struct locnet_al_event *event);
 void getKeyFromKeyCode(int keyCode, struct locnet_al_event *event);
 
 extern "C"
-JNIEXPORT jint JNICALL Java_com_fishstix_dosboxfree_DosBoxControl_nativeKey(JNIEnv * env, jobject obj, jint keyCode, jint down, jint ctrl, jint alt, jint shift)
+JNIEXPORT jint JNICALL Java_com_fishstix_dosboxfree_DosBoxControl_nativeKeyboardStroke(JNIEnv * env, jobject obj, jint keyCode, jint down, jint ctrl, jint alt, jint shift)
 {
 	if (keyCode == AKEYCODE_INVALID)
 		return 0;
@@ -351,36 +351,211 @@ JNIEXPORT jint JNICALL Java_com_fishstix_dosboxfree_DosBoxControl_nativeKey(JNIE
 }
 
 extern "C"
-JNIEXPORT void JNICALL Java_com_fishstix_dosboxfree_DosBoxControl_nativeJoystick(JNIEnv * env, jobject obj, jint x, jint y, jint action, jint button)
+JNIEXPORT jint JNICALL Java_com_fishstix_dosboxfree_DosBoxControl_nativeKey(JNIEnv * env, jobject obj, jint keyCode, jint down, jint ctrl, jint alt, jint shift)
 {
 	struct locnet_al_event	event;
+	event.keycode = KBD_NONE;
 
-	event.eventType = SDL_NOEVENT;
+    switch (keyCode) {
+        case 100:
+            event.keycode = KBD_z;
+            break;
+        case 101:
+            event.keycode = KBD_space;
+            break;
+        case 102:
+            event.keycode = KBD_slash;
+    }
 
-	switch (action) {
-		case 0:
-			event.eventType = SDL_JOYBUTTONDOWN;
-			event.keycode = button;
-			break;
-		case 1:
-			event.eventType = SDL_JOYBUTTONUP;
-			event.keycode = button;
-			break;
-		case 2:
-			event.eventType = SDL_JOYAXISMOTION;
-			event.x = x;
-			event.y = y;
-			break;
-	}
+	if (event.keycode != KBD_NONE) {
 
-	if 	(event.eventType != SDL_NOEVENT)
+		event.eventType = (down)?SDL_KEYDOWN:SDL_KEYUP;
+		event.modifier = 0;
+
 		eventQueue.push(event);
+
+		return 1;
+	}
+	else {
+		return 0;
+	}
+}
+
+void tableEvent(int);
+
+extern "C"
+JNIEXPORT void JNICALL Java_com_fishstix_dosboxfree_DosBoxControl_nativeTableEvent(JNIEnv* env, jobject obj, jint eventId)
+{
+    tableEvent(eventId);
+}
+
+void tapKey(int keyCode, int modifier) {
+    struct locnet_al_event event;
+    event.keycode = keyCode;
+    event.eventType = SDL_KEYDOWN;
+    event.modifier = 0;
+    event.modifier |= modifier;
+    eventQueue.push(event);
+    event.eventType = SDL_KEYUP;
+    eventQueue.push(event);
+}
+
+void tableEvent(int i) {
+    //struct locnet_al_event	event;
+    switch (i)
+    {
+        // reload table
+        case 0:
+            /*event.keycode = KBD_enter;
+            event.eventType = SDL_KEYDOWN;
+            event.modifier = 0;
+
+            eventQueue.push(event);
+
+            event.eventType = SDL_KEYUP;
+            eventQueue.push(event);
+
+            event.keycode = KBD_f2;
+            event.eventType = SDL_KEYDOWN;
+
+            eventQueue.push(event);
+
+            event.eventType = SDL_KEYUP;
+            eventQueue.push(event);*/
+
+            tapKey(KBD_enter, 0);
+            tapKey(KBD_f2, 0);
+
+            break;
+        // toggle sound
+        case 1:
+/*
+            event.keycode = KBD_o;
+            event.eventType = SDL_KEYDOWN;
+            event.modifier = 0;
+            event.modifier |= KEYBOARD_ALT_FLAG;
+
+            eventQueue.push(event);
+
+            event.eventType = SDL_KEYUP;
+            eventQueue.push(event);
+
+            event.keycode = KBD_m;
+            event.eventType = SDL_KEYDOWN;
+            event.modifier = 0;
+            eventQueue.push(event);
+
+            event.eventType = SDL_KEYUP;
+            eventQueue.push(event);
+
+            event.keycode = KBD_f3;
+            event.eventType = SDL_KEYDOWN;
+            event.modifier = 0;
+            eventQueue.push(event);
+
+            event.eventType = SDL_KEYUP;
+            eventQueue.push(event);*/
+
+            tapKey(KBD_o, KEYBOARD_ALT_FLAG);
+            tapKey(KBD_m, 0);
+            tapKey(KBD_f3, 0);
+
+            break;
+        // exit game
+        case 2:
+        /*
+            event.keycode = KBD_f4;
+            event.eventType = SDL_KEYDOWN;
+            event.modifier = 0;
+            event.modifier |= KEYBOARD_ALT_FLAG;
+            eventQueue.push(event);
+
+            event.eventType = SDL_KEYUP;
+            eventQueue.push(event);*/
+            tapKey(KBD_f4, KEYBOARD_ALT_FLAG);
+
+            break;
+        // save game score permanently
+        case 3:
+            // ALT + F4
+           // tableEvent(2);
+            tapKey(KBD_f4, KEYBOARD_ALT_FLAG);
+             tapKey(KBD_enter, 0);
+            tapKey(KBD_f4, KEYBOARD_ALT_FLAG);
+            tapKey(KBD_enter, 0);
+            // ENTER, (F2)
+          //  tableEvent(0);
+            // ALT + F4 again just to be sure
+            //tableEvent(2);
+            // ENTER, (F2)
+            //tableEvent(0);
+
+            break;
+        // show scores
+        case 4:
+            tapKey(KBD_g, KEYBOARD_ALT_FLAG);
+            tapKey(KBD_h, 0);
+            /*
+            event.keycode = KBD_g;
+            event.eventType = SDL_KEYDOWN;
+            event.modifier = 0;
+            event.modifier |= KEYBOARD_ALT_FLAG;
+
+            eventQueue.push(event);
+
+            event.eventType = SDL_KEYUP;
+            eventQueue.push(event);
+
+            event.keycode = KBD_h;
+            event.eventType = SDL_KEYDOWN;
+            event.modifier = 0;
+            eventQueue.push(event);
+
+            event.eventType = SDL_KEYUP;
+            eventQueue.push(event);*/
+        // show scores centered to right
+            break;
+        case 5:
+            tableEvent(4);
+            tapKey(KBD_space, KEYBOARD_ALT_FLAG);
+            tapKey(KBD_m, 0);
+            for (int i = 0; i < 6; i++) {
+                tapKey(KBD_left, 0);
+            }
+          //  tapKey(KBD_enter, 0);
+          //  tapKey(KBD_enter, 0);
+
+            // ALT + Space
+       /*     event.keycode = KBD_space;
+            event.eventType = SDL_KEYDOWN;
+            event.modifier = 0;
+            event.modifier |= KEYBOARD_ALT_FLAG;
+
+            eventQueue.push(event);
+
+            event.eventType = SDL_KEYUP
+            eventQueue.push(event);*/
+            break;
+
+        case 6:
+            for (int i = 0; i < 5; i++) {
+                tapKey(KBD_left, 0);
+            }
+            break;
+        case 7:
+            tapKey(KBD_enter, 0);
+    }
+}
+extern "C"
+JNIEXPORT void JNICALL Java_com_fishstix_dosboxfree_DosBoxControl_nativeJoystick(JNIEnv * env, jobject obj, jint x, jint y, jint action, jint button)
+{
+
 }
 
 extern "C"
 JNIEXPORT void JNICALL Java_com_fishstix_dosboxfree_DosBoxControl_nativeMouse(JNIEnv * env, jobject obj, jint x, jint y, jint down_x, jint down_y, jint action, jint button)
 {
-	struct locnet_al_event	event;
+/*	struct locnet_al_event	event;
 
 	event.eventType = SDL_NOEVENT;
 
@@ -414,13 +589,13 @@ JNIEXPORT void JNICALL Java_com_fishstix_dosboxfree_DosBoxControl_nativeMouse(JN
 	if 	(event.eventType != SDL_NOEVENT) {
 		eventQueue.push(event);
 		//LOGD(LOG_TAG, "push action: %d  button: %d", action,button);
-	}
+	}*/
 }
 
 // fishstix
 extern "C"
 JNIEXPORT void JNICALL Java_com_fishstix_dosboxfree_DosBoxControl_nativeMouseWarp(JNIEnv * env, jobject obj, jfloat x, jfloat y, jint dst_left, jint dst_top, jint width, jint height) {
-	struct locnet_al_event	event;
+	/*struct locnet_al_event	event;
 	float abs_x = (x - dst_left) / (float)(width);
 	float abs_y = (y - dst_top) / (float)(height);
 	//LOGD(LOG_TAG, "mouse warp x->%f y->%f wid->%f hei->%f dst_left->%f dst_top->%f",x,y,width,height,dst_left,dst_top);
@@ -432,7 +607,7 @@ JNIEXPORT void JNICALL Java_com_fishstix_dosboxfree_DosBoxControl_nativeMouseWar
 	event.down_x = abs_x;
 	event.down_y = abs_y;
 	eventQueue.push(event);
-	//LOGD(LOG_TAG, "mouse warp x->%f y->%f",abs_x,abs_y);
+	//LOGD(LOG_TAG, "mouse warp x->%f y->%f",abs_x,abs_y);*/
 }
 
 /*

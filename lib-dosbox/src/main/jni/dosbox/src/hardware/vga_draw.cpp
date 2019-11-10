@@ -769,7 +769,8 @@ static void VGA_DrawEGASingleLine(Bitu /*blah*/) {
 static void VGA_DrawPart(Bitu lines) {
 	while (lines--) {
 		Bit8u * data=VGA_DrawLine( vga.draw.address, vga.draw.address_line );
-		RENDER_DrawLine(data);
+
+		RENDER_DrawLine(data);      // TODO: CRASH IS HERE
 		vga.draw.address_line++;
 		if (vga.draw.address_line>=vga.draw.address_line_total) {
 			vga.draw.address_line=0;

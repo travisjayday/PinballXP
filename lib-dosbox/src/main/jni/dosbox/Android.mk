@@ -29,11 +29,11 @@ LOCAL_PATH := $(abspath $(LOCAL_PATH))
 CG_SRCDIR := $(LOCAL_PATH)
 LOCAL_CFLAGS :=	-I$(LOCAL_PATH)/include \
 				$(foreach D, $(CG_SUBDIRS), -I$(CG_SRCDIR)/$(D)) \
-				-I$(LOCAL_PATH)/../sdl/include \
+				-I$(LOCAL_PATH)/../sdl2/include \
 				-I$(LOCAL_PATH)/../fishstix/include \
 				-I$(LOCAL_PATH) 
 #				-I$(LOCAL_PATH)/../sdl_net/include \
-#				-I$(LOCAL_PATH)/../sdl_sound/include \				
+#				-I$(LOCAL_PATH)/../sdl_sound/include \
 
 LOCAL_PATH := $(MY_PATH)
 
@@ -44,18 +44,21 @@ LOCAL_SRC_FILES := $(foreach F, $(CG_SUBDIRS), $(addprefix $(F)/,$(notdir $(wild
 LOCAL_SRC_FILES += src/snprintf.c
 LOCAL_ARM_MODE := arm
 
-ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)
+#ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)
 	# NEON OPTIMIZATIONS - enable neon in config as well
-	#FILE_LIST := $(wildcard $(LOCAL_PATH)/src/math_neon/*.cpp)
-	#LOCAL_SRC_FILES += $(FILE_LIST:$(LOCAL_PATH)/%=%)
-	#LOCAL_ARM_NEON := true
-endif
+	FILE_LIST := $(wildcard $(LOCAL_PATH)/src/math-neon/*.cpp)
+	LOCAL_SRC_FILES += $(FILE_LIST:$(LOCAL_PATH)/%=%)
+
+	LOCAL_ARM_NEON := true
+
+
+#endif
 
 LOCAL_CPPFLAGS := $(LOCAL_CFLAGS)
 LOCAL_CXXFLAGS := $(LOCAL_CFLAGS)
 
 
-LOCAL_STATIC_LIBRARIES := snprintf
+LOCAL_STATIC_LIBRARIES := snprintf llog
 #LOCAL_STATIC_LIBRARIES := sdl sdl_net sdl_sound mt32emu snprintf
 
 

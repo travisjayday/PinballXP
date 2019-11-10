@@ -113,7 +113,7 @@ private:
 	bool	Open				(void);
 	void	Close				(void);
 
-	SDL_CD*	cd;
+	//SDL_CD*	cd;
 	int		driveID;
 	Uint32	oldLeadOut;
 };

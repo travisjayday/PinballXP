@@ -483,7 +483,7 @@ bool PIC_RunQueue(void) {
 		pic_queue.next_entry=entry->next;
 
 		srv_lag = entry->index;
-		(entry->pic_event)(entry->value); // call the event handler
+		(entry->pic_event)(entry->value); // call the event handler // TODO: crash here
 
 		/* Put the entry in the free list */
 		entry->next=pic_queue.free_entry;

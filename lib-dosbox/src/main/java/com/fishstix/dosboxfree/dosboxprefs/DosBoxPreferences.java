@@ -95,7 +95,7 @@ public class DosBoxPreferences extends PreferenceActivity implements OnSharedPre
 	
 	public static final String CONFIG_FILE = "dosbox.conf";
 	public static String CONFIG_PATH = Environment.getExternalStorageDirectory().getAbsolutePath()+"/Android/data/com.fishstix.dosbox/files/";//"/sdcard/";
-	public static String STORAGE_PATH = Environment.getExternalStorageDirectory().getAbsolutePath()+"/Downloads/";//"/sdcard/";
+	public static String STORAGE_PATH = CONFIG_PATH; //Environment.getExternalStorageDirectory().getAbsolutePath()+"/Downloads/";//"/sdcard/";
     // mappings
 	private GamePreference confmap_custom[] = new GamePreference[NUM_USB_MAPPINGS];
 	    
@@ -120,6 +120,7 @@ public class DosBoxPreferences extends PreferenceActivity implements OnSharedPre
 	    setContentView(R.layout.config);
 	    ctx = this;
 	    STORAGE_PATH = DosBoxPreferences.getExternalDosBoxDir(ctx);
+	    //SoEnvironment.getExternalStorageDirectory().getAbsolutePath()+"/Android/data/com.fishstix.dosbox/files/"
 	    if (isExternalStorageWritable()) {
 	    	CONFIG_PATH = ctx.getExternalFilesDir(null).getAbsolutePath() + "/";
 	    } else {
@@ -127,8 +128,8 @@ public class DosBoxPreferences extends PreferenceActivity implements OnSharedPre
 		}
 		prefs = PreferenceManager.getDefaultSharedPreferences(this);
 	    
-	    if (prefs.getString("dosautoexec", "-1").contentEquals("-1")) 
-	    	prefs.edit().putString("dosautoexec","mount c: "+STORAGE_PATH+" \nc:").commit();
+	    if (prefs.getString("dosautoexec", "-1").contentEquals("-1"))
+	    	prefs.edit().putString("dosautoexec","mount c: "+STORAGE_PATH+" \nc:\necho 'HELLO WORLD'").commit();
 	    if (prefs.getString("dosmanualconf_file", "-1").contentEquals("-1")) 
 	    	prefs.edit().putString("dosmanualconf_file",CONFIG_PATH+CONFIG_FILE).commit();
 	    
@@ -174,13 +175,13 @@ public class DosBoxPreferences extends PreferenceActivity implements OnSharedPre
 //	    confmapanalog_joy.setOnPreferenceClickListener(this);
 	    version = (Preference) findPreference("version");
 	    version.setOnPreferenceClickListener(this);
-	    confcustom_add.setOnPreferenceClickListener(this);
-	    confcustom_clear.setOnPreferenceClickListener(this);
+//	    confcustom_add.setOnPreferenceClickListener(this);
+//	    confcustom_clear.setOnPreferenceClickListener(this);
 	    
 	    // get Custom Mappings
-	    for(short i = 0; i<NUM_USB_MAPPINGS;i++){
-	    	confmap_custom[i] = (GamePreference) findPreference("confmap_custom"+String.valueOf(i));
-	    }
+//	    for(short i = 0; i<NUM_USB_MAPPINGS;i++){
+//	    	confmap_custom[i] = (GamePreference) findPreference("confmap_custom"+String.valueOf(i));
+//	    }
 
 	    prefCatOther = (PreferenceCategory) findPreference("prefCatOther");
 	    InputFilter[] filterArray = new InputFilter[2];
@@ -229,15 +230,15 @@ public class DosBoxPreferences extends PreferenceActivity implements OnSharedPre
 		//}
 		
 		// enable/disable settings based upon input mode
-		configureInputSettings(Integer.valueOf(prefs.getString("confinputmode", "0")));
+		//configureInputSettings(Integer.valueOf(prefs.getString("confinputmode", "0")));
 
 		// disable dpad sensitivity when dpad is not enabled
-		update_confenabledpad();
+//		update_confenabledpad();
 		
 		
 		// update MT32 config
 
-		boolean MTROM_valid = true;
+		/*boolean MTROM_valid = true;
 		File rom = new File(getFilesDir().toString() +"/MT32_CONTROL.ROM");
 		if (!rom.exists()) {
 			MTROM_valid = false;
@@ -249,12 +250,12 @@ public class DosBoxPreferences extends PreferenceActivity implements OnSharedPre
 		if (!MTROM_valid) {
 			dosmt32.setSummary(R.string.mt32missing);
 			dosmt32.setEnabled(false);
-		}
+		}*/
 
 		
 	    // get the two custom preferences
 	    Preference versionPref = (Preference) findPreference("version");
-	    Preference helpPref = (Preference) findPreference("help");
+	    //Preference helpPref = (Preference) findPreference("help");
 	    doseditconf_file.setOnPreferenceClickListener(this);
 	    //helpPref.setOnPreferenceClickListener(this);
 	    String versionName = "";
@@ -268,7 +269,7 @@ public class DosBoxPreferences extends PreferenceActivity implements OnSharedPre
 	    versionPref.setSummary(versionName);
 	   
 	    // update button mapping summary
-	    updateMapSummary();
+	    //updateMapSummary();
 	    prefs.registerOnSharedPreferenceChangeListener(this);
 	}
 	
@@ -302,12 +303,12 @@ public class DosBoxPreferences extends PreferenceActivity implements OnSharedPre
 				(key.contentEquals("dosglide")) )  {
 				Toast.makeText(ctx, R.string.restart, Toast.LENGTH_SHORT).show();
 		} else {
-			updateMapSummary();
+			//updateMapSummary();
 		}
 	}
 	
 	private void configureInputSettings(int input_mode) {
-		switch (input_mode) {
+		/*switch (input_mode) {
 		case TOUCHSCREEN_MOUSE:
 			// enable tracking settings
 			confmousetracking.setEnabled(true);
@@ -334,7 +335,7 @@ public class DosBoxPreferences extends PreferenceActivity implements OnSharedPre
 
 			confbuttonoverlay.getEditor().putBoolean("confbuttonoverlay", false).commit();
 			break;		
-		}		
+		}		*/
 	}
 
 	private void update_dosmanualconf() {
@@ -396,16 +397,15 @@ public class DosBoxPreferences extends PreferenceActivity implements OnSharedPre
 	}
 	
 	private void update_confenabledpad() {
-		if (prefs.getBoolean("confenabledpad",false)) {
+		/*if (prefs.getBoolean("confenabledpad",false)) {
 			confdpadsensitivity.setEnabled(true);
 		} else {
 			confdpadsensitivity.setEnabled(false);
-		}
+		}*/
 	}
-
 	
 	private void updateMapSummary() {
-		try {
+		/*try {
 			// set button mapping descriptions
 	    	for (short i=0;i<NUM_USB_MAPPINGS;i++) {
 	    		confmap_custom[i].setSummary(getMapKey(Integer.valueOf(confmap_custom[i].getDosCode())));
@@ -423,7 +423,7 @@ public class DosBoxPreferences extends PreferenceActivity implements OnSharedPre
 	    	}
 		} catch (NumberFormatException e) {
 			e.printStackTrace();
-		}
+		}*/
 	}
 
 
@@ -763,7 +763,9 @@ public class DosBoxPreferences extends PreferenceActivity implements OnSharedPre
 	    // what you place here, since the user often manages these files.  For
 	    // pictures and other media owned by the application, consider
 	    // Context.getExternalMediaDir().
-	    File path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+
+		//Environment.getExternalStorageDirectory().getAbsolutePath()+"/Android/data/com.fishstix.dosbox/files/";
+	    File path = new File(CONFIG_PATH); // Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
 
 	    // Make sure the Pictures directory exists.
 	    if (!path.exists()) {

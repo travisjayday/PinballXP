@@ -21,10 +21,19 @@
 #define _GNU_SOURCE
 #endif
 
-#include <android/log.h>
+/*#include <android/log.h>
 #define LOGV(LOG_TAG, ...) __android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, __VA_ARGS__)
 #define LOGE(LOG_TAG, ...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
-#define LOG_TAG "DosBoxTurbo"
+#define LOG_TAG "DosBoxTurbo"*/
+#include <android/log.h>
+
+#define  LOG_TAG    "DosBoxTurbo"
+
+#define  LOGE(...)  __android_log_print(ANDROID_LOG_ERROR,LOG_TAG,__VA_ARGS__)
+#define  LOGW(...)  __android_log_print(ANDROID_LOG_WARN,LOG_TAG,__VA_ARGS__)
+#define  LOGD(...)  __android_log_print(ANDROID_LOG_DEBUG,LOG_TAG,__VA_ARGS__)
+#define  LOGI(...)  __android_log_print(ANDROID_LOG_INFO,LOG_TAG,__VA_ARGS__)
+
 
 #include <stdlib.h>
 #include <string.h>
@@ -55,8 +64,9 @@
 #include "cross.h"
 #include "control.h"
 
+#define NO_OVERLAY
 #define MAPPERFILE "mapper-" VERSION ".map"
-//#define DISABLE_JOYSTICK
+#define DISABLE_JOYSTICK
 
 #if C_OPENGL
 #include "SDL_opengl.h"
@@ -213,7 +223,9 @@ struct SDL_Block {
 	} priority;
 	SDL_Rect clip;
 	SDL_Surface * surface;
+	#ifndef NO_OVERLAY
 	SDL_Overlay * overlay;
+	#endif
 	SDL_cond *cond;
 	struct {
 		bool autolock;
@@ -228,8 +240,8 @@ struct SDL_Block {
 	bool using_windib;
 #endif
 	// state of alt-keys for certain special handlings
-	Bit8u laltstate;
-	Bit8u raltstate;
+	Bit32u laltstate;
+	Bit32u raltstate;
 };
 
 static SDL_Block sdl;
@@ -252,13 +264,13 @@ void GFX_SetTitle(Bit32s cycles,Bits frameskip,bool paused){
 	}
 
 	if(paused) strcat(title," PAUSED");
-	SDL_WM_SetCaption(title,VERSION);
+	//SDL_WM_SetCaption(title,VERSION);
 }
 
 static void PauseDOSBox(bool pressed) {
 	if (!pressed)
 		return;
-	while (loadf->pause) {
+	while (loadf->pause) {      // TODO: crash here
 		sleep(1);
 	}
 #if 0	//PORTING_DISABLE
@@ -347,11 +359,13 @@ check_gotbpp:
 		flags|=GFX_SCALING;
 		goto check_gotbpp;
 #endif
+#ifndef NO_OVERLAY
 	case SCREEN_OVERLAY:
 		if (flags & GFX_RGBONLY || !(flags&GFX_CAN_32)) goto check_surface;
 		flags|=GFX_SCALING;
 		flags&=~(GFX_CAN_8|GFX_CAN_15|GFX_CAN_16);
 		break;
+		#endif
 #if C_OPENGL
 	case SCREEN_OPENGL:
 		if (flags & GFX_RGBONLY || !(flags&GFX_CAN_32)) goto check_surface;
@@ -594,6 +608,7 @@ dosurface:
 		sdl.desktop.type=SCREEN_SURFACE_DDRAW;
 		break;
 #endif
+#ifndef NO_OVERLAY
 	case SCREEN_OVERLAY:
 		if (sdl.overlay) {
 			SDL_FreeYUVOverlay(sdl.overlay);
@@ -609,6 +624,7 @@ dosurface:
 		sdl.desktop.type=SCREEN_OVERLAY;
 		retFlags = GFX_CAN_32 | GFX_SCALING | GFX_HARDWARE;
 		break;
+		#endif
 #if C_OPENGL
 	case SCREEN_OPENGL:
 	{
@@ -719,10 +735,10 @@ dosurface:
 void GFX_CaptureMouse(void) {
 	sdl.mouse.locked=!sdl.mouse.locked;
 	if (sdl.mouse.locked) {
-		SDL_WM_GrabInput(SDL_GRAB_ON);
+		//SDL_WM_GrabInput(SDL_GRAB_ON);
 		SDL_ShowCursor(SDL_DISABLE);
 	} else {
-		SDL_WM_GrabInput(SDL_GRAB_OFF);
+		//SDL_WM_GrabInput(SDL_GRAB_OFF);
 		if (sdl.mouse.autoenable || !sdl.mouse.autolock) SDL_ShowCursor(SDL_ENABLE);
 	}
         mouselocked=sdl.mouse.locked;
@@ -754,7 +770,7 @@ static void SwitchFullScreen(bool pressed) {
 
 bool GFX_StartUpdate(Bit8u * & pixels,Bitu & pitch) {
 	Android_LockSurface();
-	pixels=(Bit8u *)loadf->videoBuffer;
+	pixels=(Bit8u *)loadf->videoBuffer;     // TODO: crash here
 	pitch=loadf->rowbytes;
 	//pitch=loadf->width * 2;
 	sdl.updating=true;
@@ -791,12 +807,14 @@ bool GFX_StartUpdate(Bit8u * & pixels,Bitu & pitch) {
 		sdl.updating=true;
 		return true;
 #endif
+#ifndef NO_OVERLAY
 		case SCREEN_OVERLAY:
 		SDL_LockYUVOverlay(sdl.overlay);
 		pixels=(Bit8u *)*(sdl.overlay->pixels);
-		pitch=*(sdl.overlay->pitches);
+		//pitch=*(sdl.overlay->pitches);
 		sdl.updating=true;
 		return true;
+		#endif
 #if C_OPENGL
 	case SCREEN_OPENGL:
 		pixels=(Bit8u *)sdl.opengl.framebuf;
@@ -897,8 +915,8 @@ void GFX_EndUpdate( const Bit16u *changedLines ) {
 		break;
 #endif
 	case SCREEN_OVERLAY:
-		SDL_UnlockYUVOverlay(sdl.overlay);
-		SDL_DisplayYUVOverlay(sdl.overlay,&sdl.clip);
+		//SDL_UnlockYUVOverlay(sdl.overlay);
+		//SDL_DisplayYUVOverlay(sdl.overlay,&sdl.clip);
 		break;
 #if C_OPENGL
 	case SCREEN_OPENGL:
@@ -962,6 +980,7 @@ Bitu GFX_GetRGB(Bit8u red,Bit8u green,Bit8u blue) {
 	case SCREEN_SURFACE:
 	case SCREEN_SURFACE_DDRAW:
 		return SDL_MapRGB(sdl.surface->format,red,green,blue);
+		#ifndef NO_OVERLAY
 	case SCREEN_OVERLAY:
 		{
 			Bit8u y =  ( 9797*(red) + 19237*(green) +  3734*(blue) ) >> 15;
@@ -973,6 +992,7 @@ Bitu GFX_GetRGB(Bit8u red,Bit8u green,Bit8u blue) {
 			return (u << 0) | (y << 8) | (v << 16) | (y << 24);
 #endif
 		}
+		#endif
 	case SCREEN_OPENGL:
 //		return ((red << 0) | (green << 8) | (blue << 16)) | (255 << 24);
 		//USE BGRA
@@ -1103,7 +1123,7 @@ static void GUI_StartUp(Section * sec) {
 #else
 	SDL_Surface* logos= SDL_CreateRGBSurfaceFrom((void*)logo,32,32,32,128,0x000000ff,0x0000ff00,0x00ff0000,0);
 #endif
-	SDL_WM_SetIcon(logos,NULL);
+	//SDL_WM_SetIcon(logos,NULL);
 #endif
 
 	sdl.desktop.fullscreen=section->Get_bool("fullscreen");
@@ -1214,8 +1234,10 @@ static void GUI_StartUp(Section * sec) {
 	} else if (output == "ddraw") {
 		sdl.desktop.want_type=SCREEN_SURFACE_DDRAW;
 #endif
+#ifndef NO_OVERLAY
 	} else if (output == "overlay") {
 		sdl.desktop.want_type=SCREEN_OVERLAY;
+		#endif
 #if C_OPENGL
 	} else if (output == "opengl") {
 		sdl.desktop.want_type=SCREEN_OPENGL;
@@ -1228,8 +1250,9 @@ static void GUI_StartUp(Section * sec) {
 		LOG_MSG("SDL:Unsupported output device %s, switching back to surface",output.c_str());
 		sdl.desktop.want_type=SCREEN_SURFACE;//SHOULDN'T BE POSSIBLE anymore
 	}
-
+#ifndef NO_OVERLAY
 	sdl.overlay=0;
+#endif
 #if C_OPENGL
    if(sdl.desktop.want_type==SCREEN_OPENGL){ /* OPENGL is requested */
 	sdl.surface=SDL_SetVideoMode(640,400,0,SDL_OPENGL);
@@ -1263,14 +1286,14 @@ static void GUI_StartUp(Section * sec) {
 
 #endif	//OPENGL
 	/* Initialize screen for first time */
-	sdl.surface=SDL_SetVideoMode(320,240,0,0);
+	sdl.surface=SDL_SetVideoMode(160,120,0,0);
 	if (sdl.surface == NULL) E_Exit("Could not initialize video: %s",SDL_GetError());
 	sdl.desktop.bpp=sdl.surface->format->BitsPerPixel;
 	if (sdl.desktop.bpp==24) {
 		LOG_MSG("SDL:You are running in 24 bpp mode, this will slow down things!");
 	}
 	GFX_Stop();
-	SDL_WM_SetCaption("DOSBox",VERSION);
+	//SDL_WM_SetCaption("DOSBox",VERSION);
 
 /* The endian part is intentionally disabled as somehow it produces correct results without according to rhoenie*/
 //#if SDL_BYTEORDER == SDL_BIG_ENDIAN
@@ -1433,7 +1456,9 @@ bool GFX_IsFullscreen(void) {
 
 void GFX_Events() {
 	//locnet, exit from shell
-	if (loadf->abort == 2) {
+
+    // TODO: CRASH 2 HERE
+	if (loadf != 0 && loadf->abort == 2) {
 		//loadf->abort = 3;
 		KEYBOARD_AddKey(KBD_e, true);
 		KEYBOARD_AddKey(KBD_e, false);
@@ -1449,12 +1474,12 @@ void GFX_Events() {
 		//loadf->eventType = SDL_FIRSTEVENT;
 		return;
 	}
-	if (loadf->pause) {
+	if (loadf != 0 && loadf->pause) {
 		PauseDOSBox(true);
 		//loadf->eventType = SDL_FIRSTEVENT;
 		return;
 	}
-
+skip_loadf:
 	struct locnet_al_event event1;
 
 	//if (!Android_PollEvent(&event1))
@@ -1462,9 +1487,11 @@ void GFX_Events() {
 
 	while (Android_PollEvent(&event1))
 	{
+
 		struct locnet_al_event *event = &event1;
-		switch (event->eventType) {
-			case SDL_MOUSEMOTION:
+		//LOGD( "CUAHGT KEYDONW EVENT + %d", event->eventType);
+		//switch (event->eventType) {
+		/*	case SDL_MOUSEMOTION:
 			{
 				if ((down_x != event->down_x) || (down_y != event->down_y)) {
 					down_x = event->down_x;
@@ -1478,6 +1505,7 @@ void GFX_Events() {
 				oldy = event->y;
 			}
 				break;
+	#if 0
 			case SDL_MOUSEMOTION_ABSOLUTE:
 			{
 				Mouse_CursorMoved(0, 0, event->down_x, event->down_y, false);
@@ -1512,10 +1540,10 @@ void GFX_Events() {
 				JOYSTICK_Button(0, event->keycode, false);
 			}
 				break;
-
-			case SDL_KEYUP:
-			case SDL_KEYDOWN:
-			{
+#endif*/
+			//case SDL_KEYUP:
+			//case SDL_KEYDOWN:
+			//{
 				/*SDL_Event	sdl_event;
 				sdl_event.type = event->eventType;
 				sdl_event.key.type = event->eventType;
@@ -1524,7 +1552,12 @@ void GFX_Events() {
 				void MAPPER_CheckEvent(SDL_Event * event);
 				MAPPER_CheckEvent(&sdl_event);*/
 
-				bool down = (event->eventType == SDL_KEYDOWN);
+
+           if (event->eventType == 2 || event->eventType == 3) {
+
+                bool down = event->eventType != 3;
+                //LOGD("SENT EVENT");
+				//bool down = (event->eventType == SDL_KEYDOWN);
 				int modifier = event->modifier;
 				bool ctrl = ((modifier & KEYBOARD_CTRL_FLAG) != 0);
 				bool alt = ((modifier & KEYBOARD_ALT_FLAG) != 0);
@@ -1550,17 +1583,20 @@ void GFX_Events() {
 
 				//loadf->keycode = KBD_NONE;
 				//loadf->modifier = 0;
+
 			}
-				break;
+		//		break;
+		/*		#if 0
 			case SDL_MOUSEMOTION_WARP:
 			{
 				Mouse_CursorSet(event->x,event->y);
 			}
 				break;
-		}
+				#endif*/
+		//}
 		//loadf->eventType = SDL_FIRSTEVENT;
 	}
-#if 0 //PORTING_DISABLE
+/*#if 0 //PORTING_DISABLE
 	SDL_Event event;
 #if defined (REDUCE_JOYSTICK_POLLING)
 	static int poll_delay=0;
@@ -1598,14 +1634,14 @@ void GFX_Events() {
 
 			/* Non-focus priority is set to pause; check to see if we've lost window or input focus
 			 * i.e. has the window been minimised or made inactive?
-			 */
+			 *
 			if (sdl.priority.nofocus == PRIORITY_LEVEL_PAUSE) {
 				if ((event.active.state & (SDL_APPINPUTFOCUS | SDL_APPACTIVE)) && (!event.active.gain)) {
 					/* Window has lost focus, pause the emulator.
 					 * This is similar to what PauseDOSBox() does, but the exit criteria is different.
 					 * Instead of waiting for the user to hit Alt-Break, we wait for the window to
 					 * regain window or input focus.
-					 */
+					 *
 					bool paused = true;
 					SDL_Event ev;
 
@@ -1633,7 +1669,7 @@ void GFX_Events() {
 								/* Now poke a "release ALT" command into the keyboard buffer
 								 * we have to do this, otherwise ALT will 'stick' and cause
 								 * problems with the app running in the DOSBox.
-								 */
+								 *
 								KEYBOARD_AddKey(KBD_leftalt, false);
 								KEYBOARD_AddKey(KBD_rightalt, false);
 							}
@@ -1673,7 +1709,7 @@ void GFX_Events() {
 			MAPPER_CheckEvent(&event);
 		}
 	}
-#endif
+#endif*/
 }
 
 #if defined (WIN32)
@@ -1782,7 +1818,10 @@ static void show_warning(char const * const message) {
 #endif
 	//printf(message);
 	if(textonly) return;
-	if(!sdl.surface) sdl.surface = SDL_SetVideoMode(320,240,0,0);
+	if(!sdl.surface) {
+
+//	    sdl.surface = SDL_SetVideoMode(320,240,0,0);
+	}
 	if(!sdl.surface) return;
 #if SDL_BYTEORDER == SDL_BIG_ENDIAN
 	Bit32u rmask = 0xff000000;
@@ -1811,7 +1850,7 @@ static void show_warning(char const * const message) {
 	}
    
 	SDL_BlitSurface(splash_surf, NULL, sdl.surface, NULL);
-	SDL_Flip(sdl.surface);
+	//SDL_Flip(sdl.surface);
 	SDL_Delay(12000);
 }
    
@@ -1946,6 +1985,7 @@ static void erasemapperfile() {
 //int main(int argc, char* argv[]) {
 int dosbox_main(int argc, const char* argv[]) {
 
+
 	try {
 		CommandLine com_line(argc,argv);
 		Config myconf(&com_line);
@@ -2030,7 +2070,7 @@ int dosbox_main(int argc, const char* argv[]) {
 #ifndef DISABLE_JOYSTICK
 	//Initialise Joystick seperately. This way we can warn when it fails instead
 	//of exiting the application
-	if( SDL_InitSubSystem(SDL_INIT_JOYSTICK) < 0 ) LOG_MSG("Failed to init joystick support");
+	//if( SDL_InitSubSystem(SDL_INIT_JOYSTICK) < 0 ) LOG_MSG("Failed to init joystick support");
 #endif
 
 	sdl.laltstate = SDL_KEYUP;
@@ -2145,8 +2185,8 @@ int dosbox_main(int argc, const char* argv[]) {
 		MAPPER_Init();
 		if (control->cmdline->FindExist("-startmapper")) MAPPER_RunInternal();
 
-		if (joytype != JOY_NONE)
-			JOYSTICK_Enable(0, true);
+		//if (joytype != JOY_NONE)
+			//JOYSTICK_Enable(0, true);
 
 		/* Start up main machine */
 		control->StartUp();
@@ -2173,14 +2213,14 @@ int dosbox_main(int argc, const char* argv[]) {
 	}
 	catch(...){
 		//Force visible mouse to end user. Somehow this sometimes doesn't happen
-		SDL_WM_GrabInput(SDL_GRAB_OFF);
+	//	SDL_WM_GrabInput(SDL_GRAB_OFF);
 		SDL_ShowCursor(SDL_ENABLE);
 		throw;//dunno what happened. rethrow for sdl to catch
 	}
 #endif
 	//Force visible mouse to end user. Somehow this sometimes doesn't happen
-	SDL_WM_GrabInput(SDL_GRAB_OFF);
-	SDL_ShowCursor(SDL_ENABLE);
+//	SDL_WM_GrabInput(SDL_GRAB_OFF);
+	//SDL_ShowCursor(SDL_ENABLE);
 
 	SDL_Quit();//Let's hope sdl will quit as well when it catches an exception
 	return 0;

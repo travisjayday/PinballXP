@@ -110,7 +110,7 @@ static void RENDER_StartLineHandler(const void * s) {
 				}
 				render.scale.outWrite += render.scale.outPitch * Scaler_ChangedLines[0];
 				RENDER_DrawLine = render.scale.lineHandler;
-				RENDER_DrawLine( s );
+				RENDER_DrawLine( s );       // TODO: CRASH HERE
 				return;
 			}
 			x--; src++; cache++;

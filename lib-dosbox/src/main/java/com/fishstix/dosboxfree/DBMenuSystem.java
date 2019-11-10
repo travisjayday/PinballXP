@@ -36,14 +36,18 @@ import java.util.Scanner;
 import com.actionbarsherlock.view.Menu;
 import com.actionbarsherlock.view.MenuItem;
 */
+import com.android.billingclient.api.BillingClient;
+import com.android.billingclient.api.BillingFlowParams;
 import com.fishstix.dosboxfree.dosboxprefs.DosBoxPreferences;
 import com.fishstix.dosboxfree.dosboxprefs.preference.GamePreference;
 import com.fishstix.dosboxfree.touchevent.TouchEventWrapper;
+import com.shamanland.adosbox2.DosHDD;
 /*
 import com.jeremyfeinstein.slidingmenu.lib.SlidingMenu;
 */
 import android.app.ActivityManager;
 import android.app.AlertDialog;
+import android.content.ClipData;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -51,6 +55,7 @@ import android.content.SharedPreferences;
 import android.content.res.AssetManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
 import android.preference.PreferenceManager;
 import android.util.Log;
 import android.util.TypedValue;
@@ -61,6 +66,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup.LayoutParams;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.LinearLayout;
 import android.widget.Toast;
 
 public class DBMenuSystem {
@@ -163,6 +169,7 @@ public class DBMenuSystem {
 				out.println();
 				out.println("[render]");
 				out.println("frameskip="+prefs.getString("dosframeskip","2"));
+				out.println("scaler=none");
 				out.println();
 				out.println("[cpu]");
 				//if (DBMain.nativeGetCPUFamily() == 3) { // mips cpu - disable dynamic core
@@ -264,11 +271,15 @@ public class DBMenuSystem {
 					out.println(scanner.nextLine());
 				}
 				// handle autoexec
-				if (prefs.getString("dosautoexec","-1").contains("-1")) {
-					out.println("mount c: "+DosBoxPreferences.getExternalDosBoxDir(context)+" \nc:");
-				} else {
-					out.println(prefs.getString("dosautoexec", "mount c: "+DosBoxPreferences.getExternalDosBoxDir(context)+" \nc:"));
-				}
+				//	if (prefs.getString("dosautoexec","-1").contains("-1")) {
+					out.println(  "mount c: " + DosHDD.hddLocation() + " -freesize 128\n" +
+							"c:\n" +
+							"cadet\n");
+				/*} else {
+					out.println(prefs.getString("dosautoexec",   "mount c: " + DosHDD.hddLocation() + " -freesize 128\n" +
+							"c:\n" +
+							"cadet\n"));
+				}*/
 				out.flush();
 				out.close();
 				myInput.close();
@@ -280,6 +291,9 @@ public class DBMenuSystem {
 		}
 		// SCALE SCREEN
 		context.mSurfaceView.mScale = prefs.getBoolean("confscale", false);
+		int spacePercent = prefs.getInt("controlspace", 20);
+		context.mSurfaceView.controlSpace = (float) spacePercent / 100.0f;
+		context.spaceSeekBar.setProgress(spacePercent);
 		
 		if (Integer.valueOf(prefs.getString("confscalelocation", "0")) == 0)
 			context.mSurfaceView.mScreenTop = false;
@@ -336,90 +350,7 @@ public class DBMenuSystem {
 		DBMain.nativeSetOption(DBMenuSystem.DOSBOX_OPTION_ID_AUTO_CPU_ON, 0,null,true);
 
 		// INPUT MODE
-		switch (Integer.valueOf(prefs.getString("confinputmode", "0"))) { 
-		case INPUT_MOUSE:
-			context.mSurfaceView.mInputMode = DBGLSurfaceView.INPUT_MODE_MOUSE;
-			break;
-		case INPUT_JOYSTICK:
-			context.mSurfaceView.mInputMode = DBGLSurfaceView.INPUT_MODE_JOYSTICK;
-			DBMain.nativeSetOption(DBMenuSystem.DOSBOX_OPTION_ID_JOYSTICK_ENABLE, 1 ,null, true);
-			break;
-		case INPUT_REAL_MOUSE:
-			context.mSurfaceView.mInputMode = DBGLSurfaceView.INPUT_MODE_REAL_MOUSE;
-			break;
-		case INPUT_REAL_JOYSTICK:
-			context.mSurfaceView.mInputMode = DBGLSurfaceView.INPUT_MODE_REAL_JOYSTICK;
-			DBMain.nativeSetOption(DBMenuSystem.DOSBOX_OPTION_ID_JOYSTICK_ENABLE, 1 ,null, true);
-			break;
-		case INPUT_SCROLL:
-			context.mSurfaceView.mInputMode = DBGLSurfaceView.INPUT_MODE_SCROLL;
-			break;
-		}
 
-		// VIRTUAL JOYSTICK
-		// test enabled
-		if (prefs.getBoolean("confjoyoverlay", false)) {
-			context.mHandler.sendMessage(context.mHandler.obtainMessage(DBMain.HANDLER_ADD_JOYSTICK,0,0));
-		} else {
-			context.mHandler.sendMessage(context.mHandler.obtainMessage(DBMain.HANDLER_REMOVE_JOYSTICK,0,0));			
-		}
-		// size & transparency & mode of joystick
-		int joysize = prefs.getInt("confjoysize", 5);
-		context.mJoystickView.setSize(joysize);
-		LayoutParams params = context.mJoystickView.getLayoutParams();
-		//Log.i("DosBoxTurbo","Joysize: " + (int)(175+((joysize-5)*5)));
-		params.height = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, (int)(175+((joysize-5)*5)), context.getResources().getDisplayMetrics());
-		context.mJoystickView.setTransparency(prefs.getInt("confjoytrans", 160)); 
-		context.mJoystickView.invalidate();
-		
-		// Joystick Center
-		context.mSurfaceView.mJoyCenterX = (prefs.getInt("confjoyx", 100)-100)+JOYSTICK_CENTER_X;
-		context.mSurfaceView.mJoyCenterY = (prefs.getInt("confjoyy", 100)-100)+JOYSTICK_CENTER_Y;
-		
-		// Joystick Mouse Emulation
-		if (prefs.getBoolean("confjoymousemode", false)) {
-			context.mSurfaceView.mJoyEmuMouse = true;
-		} else {
-			context.mSurfaceView.mJoyEmuMouse = false;
-		}
-		
-		
-		// Mouse Tracking Mode
-		if (Integer.valueOf(prefs.getString("confmousetracking", "0")) == 0) {
-			// absolute tracking
-			context.mSurfaceView.mAbsolute = true;
-		} else {
-			context.mSurfaceView.mAbsolute = false;
-		}
-		
-		// mouse sensitivity
-		context.mSurfaceView.mMouseSensitivityX = ((float)prefs.getInt("confmousesensitivityx", 50)/100f)+0.5f;
-		context.mSurfaceView.mMouseSensitivityY = ((float)prefs.getInt("confmousesensitivityy", 50)/100f)+0.5f;
-		
-		// Absolute Tracking Calibration function
-		/*if (prefs.getBoolean("conf_doReset",false)) {
-			// reset calibration data
-			context.mSurfaceView.mWarpX = 0f;
-			context.mSurfaceView.mWarpY = 0f;
-			prefs.edit().putBoolean("conf_doReset", false);
-			prefs.edit().putBoolean("conf_doCalibrate", false).commit();
-		} else if (prefs.getBoolean("conf_doCalibrate", false)) {
-			context.mSurfaceView.mCalibrate = true;
-			Toast.makeText(context, R.string.abscalibrate, Toast.LENGTH_SHORT).show();
-			prefs.edit().putBoolean("conf_doReset", false);
-			prefs.edit().putBoolean("conf_doCalibrate", false).commit();
-		}*/
-		
-		//context.mSurfaceView.mWarpX = Float.valueOf(prefs.getString("confwarpX", "0"));
-		//context.mSurfaceView.mWarpY = Float.valueOf(prefs.getString("confwarpY", "0"));
-		
-		// Input Resolution
-		if (Integer.valueOf(prefs.getString("confinputlatency", "0")) == 0) {
-			// absolute tracking
-			context.mSurfaceView.mInputLowLatency = false;
-		} else {
-			context.mSurfaceView.mInputLowLatency = true;
-		}
 		
 		// Emulate Mouse Click
 		//context.mSurfaceView.mEmulateClick = prefs.getBoolean("confmousetapclick", false);
@@ -433,28 +364,14 @@ public class DBMenuSystem {
 			context.mSurfaceView.mShowInfo = false;
 		}
 	*/	
-		if (prefs.getBoolean("confbuttonoverlay", false)) {
-			context.mHandler.sendMessage(context.mHandler.obtainMessage(DBMain.HANDLER_ADD_BUTTONS,0,0));
-		} else {
-			context.mHandler.sendMessage(context.mHandler.obtainMessage(DBMain.HANDLER_REMOVE_BUTTONS,0,0));			
-		}
+
 		
 		// enable/disable genericmotionevent handling for analog sticks
 		//context.mSurfaceView.mGenericMotion = prefs.getBoolean("confgenericmotion", false);
-		context.mSurfaceView.mAnalogStickPref = Short.valueOf(prefs.getString("confanalogsticks", "0"));
+	//	context.mSurfaceView.mAnalogStickPref = Short.valueOf(prefs.getString("confanalogsticks", "0"));
 
 		// dpad / trackpad emulation
-		context.mSurfaceView.mEnableDpad = prefs.getBoolean("confenabledpad", false);
-		try {
-			int tmp = Integer.valueOf(prefs.getString("confdpadsensitivity", "7").trim());
-			if ((tmp >= 1) && (tmp <= 25)) {
-				context.mSurfaceView.mDpadRate = tmp;
-			} else {
-				context.mSurfaceView.mDpadRate = 7;
-			}
-		} catch (NumberFormatException e) {
-			context.mSurfaceView.mDpadRate = 7;
-		}
+
 		
 		// OS 2.1 - 2.3 < > key fix
 		//context.mSurfaceView.mEnableLTKeyFix = prefs.getBoolean("conffixgingerkey", false);
@@ -462,7 +379,7 @@ public class DBMenuSystem {
 		
 		// Add custom mappings to ArrayList 
 		//context.mSurfaceView.customMapList.clear();
-		context.mSurfaceView.customMap.clear();
+		/*context.mSurfaceView.customMap.clear();
 		for (short i=0;i<DosBoxPreferences.NUM_USB_MAPPINGS;i++) {
 			int hardkey = Integer.valueOf(prefs.getString("confmap_custom"+String.valueOf(i)+GamePreference.HARDCODE_KEY, "-1"));
 			if ( hardkey > 0) {
@@ -472,27 +389,20 @@ public class DBMenuSystem {
 				}
 			}
 		}
-		Log.i("DosBoxTurbo","Found " + context.mSurfaceView.customMap.size() + " custom mappings.");
+		Log.i("DosBoxTurbo","Found " + context.mSurfaceView.customMap.size() + " custom mappings.");*/
 		
 		// Sliding Menu Style
-		if (prefs.getString("confslidingmenu", "0").contains("0")) {
-			// FIXME
-			// context.getSlidingMenu().setTouchModeAbove(SlidingMenu.TOUCHMODE_MARGIN);
-		} else {
-			// FIXME
-			// context.getSlidingMenu().setTouchModeAbove(SlidingMenu.TOUCHMODE_NONE);
-		}
-		
-		// GESTURES
+
+	/*	// GESTURES
 		context.mSurfaceView.mGestureUp = Short.valueOf(prefs.getString("confgesture_swipeup", "0"));
 		context.mSurfaceView.mGestureDown = Short.valueOf(prefs.getString("confgesture_swipedown", "0"));
-		
+
 		// TOUCHSCREEN MOUSE
 		context.mSurfaceView.mGestureSingleClick = Short.valueOf(prefs.getString("confgesture_singletap", "3"));
 		context.mSurfaceView.mGestureDoubleClick = Short.valueOf(prefs.getString("confgesture_doubletap", "5"));
 		context.mSurfaceView.mGestureTwoFinger = Short.valueOf(prefs.getString("confgesture_twofinger", "0"));
-		context.mSurfaceView.mLongPress = prefs.getBoolean("confgesture_longpress", true);
-		
+		context.mSurfaceView.mLongPress = prefs.getBoolean("confgesture_longpress", true);*/
+
 		// FORCE Physical LEFT ALT
 		context.mSurfaceView.mUseLeftAltOn = prefs.getBoolean("confaltfix", false);
 		
@@ -503,10 +413,8 @@ public class DBMenuSystem {
 		
 		if (context.mSurfaceView.mDebug) {
 			// debug mode enabled, show warning
-			Toast.makeText(context, R.string.debug, Toast.LENGTH_LONG).show();
+			//Toast.makeText(context, R.string.debug, Toast.LENGTH_LONG).show();
 		}
-		
-		context.mSurfaceView.forceRedraw();
 	}
 	
 
@@ -584,7 +492,7 @@ public class DBMenuSystem {
 	
 	static public boolean doPrepareOptionsMenu(DBMain context, Menu menu) {
 		//menu.findItem(MENU_SETTINGS_SCALE).setTitle((context.mSurfaceView.mScale)?"Scale: On":"Scale: Off");
-		menu.findItem(R.id.menu_scale).setTitle((context.mSurfaceView.mScale)?"Scale: On":"Scale: Off");
+		//menu.findItem(R.id.menu_scale).setTitle((context.mSurfaceView.mScale)?"Scale: On":"Scale: Off");
 		return true;
 	}
 	
@@ -597,28 +505,28 @@ public class DBMenuSystem {
 	}
 	
 	static public void doShowKeyboard(DBMain context) {
-		InputMethodManager imm = (InputMethodManager)context.getSystemService(Context.INPUT_METHOD_SERVICE);
+		/*InputMethodManager imm = (InputMethodManager)context.getSystemService(Context.INPUT_METHOD_SERVICE);
 		if (imm != null) {
 			if (!context.mSurfaceView.hasFocus()){ 
 		        context.mSurfaceView.requestFocus();
 			}
 			imm.showSoftInput(context.mSurfaceView, 0);
-			context.mSurfaceView.mKeyboardVisible = true;
-		}
+			//context.mSurfaceView.mKeyboardVisible = true;
+		}*/
 	}
 
 	static public void doHideKeyboard(DBMain context) {
-		InputMethodManager imm = (InputMethodManager)context.getSystemService(Context.INPUT_METHOD_SERVICE);
+	/*	InputMethodManager imm = (InputMethodManager)context.getSystemService(Context.INPUT_METHOD_SERVICE);
 		if (imm != null) {
 			imm.hideSoftInputFromWindow(context.mSurfaceView.getWindowToken(), 0);
-			context.mSurfaceView.mKeyboardVisible = false;
-		}
+			//context.mSurfaceView.mKeyboardVisible = false;
+		}*/
 	}
 	
 	static public void doConfirmQuit(final DBMain context) {
     	AlertDialog.Builder builder = new AlertDialog.Builder(context);
     	builder.setTitle(R.string.app_name);
-		builder.setMessage("Exit DosBox?");
+		builder.setMessage("Exit Pinball? High scores will be saved.");
 		
 		builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
 			public void onClick(DialogInterface arg0, int arg1) {
@@ -643,55 +551,140 @@ public class DBMenuSystem {
 		context.mSurfaceView.mInfoHide = show;
 		context.mSurfaceView.forceRedraw();
 	}*/
-	
+
+	private static boolean showingHighscores = false;
 	static public boolean doOptionsItemSelected(DBMain context, MenuItem item)
 	{
 		List<Integer> ids = Arrays.asList(
 				R.id.menu_exit,
-				R.id.menu_inputmethod,
-				R.id.menu_specialkeys,
-				R.id.menu_keyboard,
-				R.id.menu_joystick,
-				R.id.menu_scale,
-				R.id.menu_settings
+		//		R.id.menu_inputmethod,
+		//		R.id.menu_specialkeys,
+		//	R.id.menu_keyboard,
+		///		R.id.menu_joystick,
+				R.id.menu_settings,
+                R.id.menu_modify_controls,
+                R.id.menu_remove_ads,
+                R.id.menu_boost,
+		//		R.id.menu_ingame_sound,
+				R.id.menu_ingame_music,
+				R.id.menu_highscore
 		);
 
+		DBMain dbMain = (DBMain) context;
 		switch(ids.indexOf(item.getItemId())){
 			case 0:
 				doConfirmQuit(context);
 			    break;
 			case 1:
-			{
+				Toast.makeText(context,
+						"Warning: Changing settings might result in braking the app. Uninstall/Reinstall if something goes wrong.",
+						Toast.LENGTH_LONG).show();
+				if (context.mPID != null) {
+					Intent i = new Intent(context, DosBoxPreferences.class);
+					Bundle b = new Bundle();
+					b.putString("com.fishstix.dosboxlauncher.pid", context.mPID);
+					b.putBoolean("com.fishstix.dosboxlauncher.mlic", true);
+					i.putExtras(b);
+					context.startActivity(i);
+				} else {
+					Intent i = new Intent(context, DosBoxPreferences.class);
+					Bundle b = new Bundle();
+					b.putBoolean("com.fishstix.dosboxlauncher.mlic", true);
+					i.putExtras(b);
+					context.startActivity(i);
+				}
+			/*
 				InputMethodManager imm = (InputMethodManager)context.getSystemService(Context.INPUT_METHOD_SERVICE);
 				if (imm != null)
-					imm.showInputMethodPicker();
-			}
+					imm.showInputMethodPicker();*/
 				break;
-
+			// modify controls
 			case 2:
-				context.mSurfaceView.mContextMenu = CONTEXT_MENU_SPECIAL_KEYS;				
-				context.openContextMenu(context.mSurfaceView);
-				break;
-			case 3:
-				if (context.mSurfaceView.mKeyboardVisible)
-					doHideKeyboard(context);
-				else 
-					doShowKeyboard(context);
-				break;
-			case 4:
-				if (!getBooleanPreference(context,"confjoyoverlay")) {
-					context.mHandler.sendMessage(context.mHandler.obtainMessage(DBMain.HANDLER_ADD_JOYSTICK,0,0));
-				} else {
-					context.mHandler.sendMessage(context.mHandler.obtainMessage(DBMain.HANDLER_REMOVE_JOYSTICK,0,0));
+				if (!dbMain.showingControls) {
+					dbMain.showControls();
+					Toast.makeText(context, "Press the ⏎ (back) button to resume game", Toast.LENGTH_LONG).show();
+				}
+				else {
+					dbMain.hideControls();
 				}
 				break;
-			case 5:
-				context.mSurfaceView.mScale = !context.mSurfaceView.mScale;
-				saveBooleanPreference(context, "confscale",context.mSurfaceView.mScale);
-				context.bScaling.setChecked(context.mSurfaceView.mScale);
-				context.mSurfaceView.forceRedraw();
+				// remove ads
+			case 3:
+				if (dbMain.mBillingManager == null) {
+					dbMain.createBilling();
+				}
+				if (!dbMain.mBillingManager.boughtNoAds)
+					context.mBillingManager.initiatePurchaseFlow("no_ads", "inapp");
+				else
+					Toast.makeText(context, "Already purchased 'no-ads'!", Toast.LENGTH_SHORT).show();
 				break;
+			case 4:
+			    boolean sound = !getBooleanPreference(context, "confsound");
+                saveBooleanPreference(context, "confsound", sound);
+                //context.bScaling.setChecked(!sound);
+                if (sound)
+					Toast.makeText(context, "Boost: OFF; Restart App to apply changes", Toast.LENGTH_LONG).show();
+                else
+					Toast.makeText(context, "Boost: ON; Restart App to apply changes", Toast.LENGTH_LONG).show();
+
+				if (context.mSurfaceView != null)
+                	context.mSurfaceView.forceRedraw();
+
+
+                /*
+				context.mSurfaceView.mContextMenu = CONTEXT_MENU_SPECIAL_KEYS;				
+				context.openContextMenu(context.mSurfaceView);*/
+				break;
+
+			// case ingame sound toggled
+			case 5:
+				// press ALT + O, then M
+				DosBoxControl.nativeTableEvent(1);
+				break;
+			// show highscore
 			case 6:
+				if (!showingHighscores) {
+					if (DBMenuSystem.getBooleanPreference(context, "confscale")) {
+						DosBoxControl.nativeTableEvent(5);
+
+						(new Handler()).postDelayed(new Runnable() {
+							@Override
+							public void run() {
+								DosBoxControl.nativeTableEvent(6);
+								(new Handler()).postDelayed(new Runnable() {
+									@Override
+									public void run() {
+										DosBoxControl.nativeTableEvent(6);
+										(new Handler()).postDelayed(new Runnable() {
+											@Override
+											public void run() {
+												DosBoxControl.nativeTableEvent(6);
+												(new Handler()).postDelayed(new Runnable() {
+													@Override
+													public void run() {
+														DosBoxControl.nativeTableEvent(7);
+													}
+												}, 100);
+											}
+										}, 100);
+									}
+								}, 100);
+							}
+						}, 100);
+					}
+					else
+						DosBoxControl.nativeTableEvent(4);
+					showingHighscores = true;
+				}
+				else {
+					// send f4
+					DosBoxControl.nativeTableEvent(2);
+					// send f3
+					DosBoxControl.nativeTableEvent(1);
+					showingHighscores = false;
+				}
+				break;
+			case 7:
 				if (context.mPID != null) {
 					Intent i = new Intent(context, DosBoxPreferences.class);
 					Bundle b = new Bundle();
@@ -712,245 +705,7 @@ public class DBMenuSystem {
 		  }
 		  return true;
 	}
-	
-	static public void doCreateContextMenu(DBMain context, ContextMenu menu, View v, ContextMenu.ContextMenuInfo menuInfo) {
-		switch (context.mSurfaceView.mContextMenu) {
-			case CONTEXT_MENU_SPECIAL_KEYS:
-			{
-				android.view.MenuItem item;
-				item = menu.add(0, MENU_KEYBOARD_CTRL, 0, "Ctrl");
-				item.setCheckable(true);
-				item.setChecked(context.mSurfaceView.mModifierCtrl);
 
-				item = menu.add(0, MENU_KEYBOARD_ALT, 0, "Alt");
-				item.setCheckable(true);
-				item.setChecked(context.mSurfaceView.mModifierAlt);
-						
-				item = menu.add(0, MENU_KEYBOARD_SHIFT, 0, "Shift");
-				item.setCheckable(true);
-				item.setChecked(context.mSurfaceView.mModifierShift);
-
-				menu.add(0, MENU_KEYBOARD_ESC, 0, "ESC");
-				menu.add(0, MENU_KEYBOARD_TAB, 0, "Tab");
-				menu.add(0, MENU_KEYBOARD_DEL, 0, "Del");
-				menu.add(0, MENU_KEYBOARD_INSERT, 0, "Ins");
-				menu.add(0, MENU_KEYBOARD_PAUSE_BREAK, 0, "Break");
-				menu.add(0, MENU_KEYBOARD_SCROLL_LOCK,0,"Scrl. Lck");
-				
-				for(int i = MENU_KEYBOARD_F1; i <= MENU_KEYBOARD_F12; i++)
-					menu.add(0, i, 0, "F"+(i-MENU_KEYBOARD_F1+1));	
-
-				menu.add(0, MENU_KEYBOARD_SWAP_MEDIA, 0, "Swap Media");
-				context.mSurfaceView.mContextMenu = -1;
-
-				item = menu.add(0, MENU_KEYBOARD_TURBO, 0, "Fast Forward");
-				item.setCheckable(true);
-				item.setChecked(context.mTurboOn);
-			}
-				break;
-			case CONTEXT_MENU_CYCLES:
-			{
-				
-				android.view.MenuItem item = menu.add(1, MENU_CYCLE_AUTO, 0, "Auto");
-				if (DosBoxControl.nativeGetAutoAdjust()) {
-					item.setChecked(true);
-				}
-				for(int i = MENU_CYCLE_AUTO+1; i <= MENU_CYCLE_55000; i++) {
-					int value = (i-MENU_CYCLE_AUTO) * 1000;
-					 item = menu.add(1, i, 0, ""+value);
-					
-					if (!DosBoxControl.nativeGetAutoAdjust() && (value == DosBoxControl.nativeGetCycleCount())) {
-						item.setChecked(true);
-					}
-				}
-				
-				menu.setGroupCheckable(1, true, true);
-			}
-				break;
-			case CONTEXT_MENU_FRAMESKIP:
-			{
-				for(int i = MENU_FRAMESKIP_0; i <= MENU_FRAMESKIP_10; i++) {
-					int value = (i-MENU_FRAMESKIP_0);
-					android.view.MenuItem item = menu.add(2, i, 0, ""+value);
-
-					if (value == DosBoxControl.nativeGetFrameSkipCount()) {
-						item.setChecked(true);
-					}
-				}
-				menu.setGroupCheckable(2, true, true);
-			}
-			break;
-			case CONTEXT_MENU_TRACKING:
-			{
-				android.view.MenuItem item = menu.add(3, MENU_TRACKING_ABS, 0, "Absolute");
-				android.view.MenuItem item2 = menu.add(3, MENU_TRACKING_REL, 0, "Relative");
-				if (context.mSurfaceView.mAbsolute) {
-					item.setChecked(true);
-				} else {
-					item2.setChecked(true);
-				}
-				menu.setGroupCheckable(3, true, true);
-			}
-			break;
-			case CONTEXT_MENU_INPUTMODE:
-			{
-				for(int i = INPUT_MOUSE; i <= INPUT_SCROLL; i++) {
-					android.view.MenuItem item;
-					switch (i) {
-					case INPUT_MOUSE:
-						item = menu.add(4, i, 0, context.getString(R.string.input_touchscreen));
-						if (context.mSurfaceView.mInputMode == DBGLSurfaceView.INPUT_MODE_MOUSE) {
-							item.setChecked(true);
-						}
-					break;
-					case INPUT_REAL_MOUSE:
-						item = menu.add(4, i, 0, context.getString(R.string.input_mouse));
-						if (context.mSurfaceView.mInputMode == DBGLSurfaceView.INPUT_MODE_REAL_MOUSE) {
-							item.setChecked(true);
-						}
-					break;
-					case INPUT_REAL_JOYSTICK:
-						item = menu.add(4, i, 0, context.getString(R.string.input_joystick));
-						if (context.mSurfaceView.mInputMode == DBGLSurfaceView.INPUT_MODE_REAL_JOYSTICK) {
-							item.setChecked(true);
-						}
-					break;
-					case INPUT_SCROLL:
-						item = menu.add(4, i, 0, context.getString(R.string.input_scroll));
-						if (context.mSurfaceView.mInputMode == DBGLSurfaceView.INPUT_MODE_SCROLL) {
-							item.setChecked(true);
-						}
-					break;
-					}
-				}
-				menu.setGroupCheckable(2, true, true);
-			}
-			break;			
-		}
-	}
-	
-	static public void doSendDownUpKey(DBMain context, int keyCode) {
-		DosBoxControl.sendNativeKey(keyCode , true, context.mSurfaceView.mModifierCtrl, context.mSurfaceView.mModifierAlt, context.mSurfaceView.mModifierShift);
-		DosBoxControl.sendNativeKey(keyCode , false, context.mSurfaceView.mModifierCtrl, context.mSurfaceView.mModifierAlt, context.mSurfaceView.mModifierShift);
-		context.mSurfaceView.mModifierCtrl = false;
-		context.mSurfaceView.mModifierAlt = false;
-		context.mSurfaceView.mModifierShift = false;
-	}
-	
-	static public boolean doContextItemSelected(DBMain context, android.view.MenuItem item) {
-		int itemID = item.getItemId();
-		
-		switch(itemID) {
-		case MENU_KEYBOARD_CTRL:
-			context.mSurfaceView.mModifierCtrl = !context.mSurfaceView.mModifierCtrl; 
-			break;
-		case MENU_KEYBOARD_ALT:
-			context.mSurfaceView.mModifierAlt = !context.mSurfaceView.mModifierAlt; 
-			break;		
-		case MENU_KEYBOARD_SHIFT:
-			context.mSurfaceView.mModifierShift = !context.mSurfaceView.mModifierShift; 
-			break;		
-		case MENU_KEYBOARD_TAB:
-			doSendDownUpKey(context, KeyEvent.KEYCODE_TAB);
-			break;
-		case MENU_KEYBOARD_ESC:
-			doSendDownUpKey(context, TouchEventWrapper.KEYCODE_ESCAPE);
-			break;
-		case MENU_KEYBOARD_DEL:
-			doSendDownUpKey(context, TouchEventWrapper.KEYCODE_FORWARD_DEL);
-			break;
-		case MENU_KEYBOARD_INSERT:
-			doSendDownUpKey(context, TouchEventWrapper.KEYCODE_INSERT);
-			break;
-		case MENU_KEYBOARD_PAUSE_BREAK:
-			doSendDownUpKey(context, TouchEventWrapper.KEYCODE_PAUSE_BREAK);
-			break;
-		case MENU_KEYBOARD_SCROLL_LOCK:
-			doSendDownUpKey(context, TouchEventWrapper.KEYCODE_SCROLL_LOCK);
-			break;
-		case MENU_KEYBOARD_TURBO:
-			context.mTurboOn = !context.mTurboOn;
-			DBMain.nativeSetOption(DOSBOX_OPTION_ID_TURBO_ON, context.mTurboOn?1:0, null,true);
-		case MENU_KEYBOARD_SWAP_MEDIA:
-			DBMain.nativeSetOption(DOSBOX_OPTION_ID_SWAP_MEDIA, 1,null,true);
-			break;
-		case MENU_TRACKING_ABS:
-			context.mSurfaceView.mAbsolute = true;
-			context.iTracking.setText("Absolute");
-			savePreference(context, "confmousetracking", "0");
-			break;
-		case MENU_TRACKING_REL:
-			context.mSurfaceView.mAbsolute = false;
-			context.iTracking.setText("Relative");
-			savePreference(context, "confmousetracking", "1");
-			break;
-		default:
-			if ((itemID >= MENU_KEYBOARD_F1) && (itemID <= MENU_KEYBOARD_F12)) {
-				doSendDownUpKey(context, KEYCODE_F1 + (itemID - MENU_KEYBOARD_F1));
-			}
-			else if ((itemID >= MENU_CYCLE_AUTO) && (itemID <= MENU_CYCLE_55000)) {
-				if (context.mTurboOn) { 
-					context.mTurboOn = false;
-					DBMain.nativeSetOption(DBMenuSystem.DOSBOX_OPTION_ID_TURBO_ON, context.mTurboOn?1:0, null,true);			
-				}
-				int cycles = -1;
-				if (itemID == MENU_CYCLE_AUTO) {
-					cycles = -1;
-				} else {
-					cycles = (itemID - MENU_CYCLE_AUTO) * 1000;
-				}
-				savePreference(context, PREF_KEY_CYCLES, String.valueOf(cycles));
-				DBMain.nativeSetOption(DOSBOX_OPTION_ID_CYCLES,cycles,null,true);
-				if (DosBoxControl.nativeGetAutoAdjust()) {
-					context.iCycles.setText("Auto");
-					Toast.makeText(context, "Auto Cycles ["+DosBoxControl.nativeGetCycleCount() +"%]", Toast.LENGTH_SHORT).show();
-				} else {
-					context.iCycles.setText(String.valueOf(DosBoxControl.nativeGetCycleCount()));
-					Toast.makeText(context, "DosBox Cycles: "+DosBoxControl.nativeGetCycleCount(), Toast.LENGTH_SHORT).show();
-				} 
-				
-			}
-			else if ((itemID >= MENU_FRAMESKIP_0) && (itemID <= MENU_FRAMESKIP_10)) {
-				int frameskip = (itemID - MENU_FRAMESKIP_0); 
-				savePreference(context, PREF_KEY_FRAMESKIP,String.valueOf(frameskip));
-				DBMain.nativeSetOption(DOSBOX_OPTION_ID_FRAMESKIP, frameskip ,null,true);
-				context.iFrameSkip.setText(String.valueOf(frameskip));
-			} else if ((itemID >= INPUT_MOUSE) && (itemID <= INPUT_SCROLL)) {
-				savePreference(context,"confinputmode",String.valueOf(itemID));
-				switch (itemID) {
-				case INPUT_MOUSE:
-					context.mSurfaceView.mInputMode = DBGLSurfaceView.INPUT_MODE_MOUSE;
-					context.iInputMode.setText(R.string.input_touchscreen);
-					if (!getBooleanPreference(context,"confjoyoverlay")) {
-						DBMain.nativeSetOption(DBMenuSystem.DOSBOX_OPTION_ID_JOYSTICK_ENABLE, 0 ,null, true);
-					}
-				break;
-				case INPUT_REAL_MOUSE:
-					context.mSurfaceView.mInputMode = DBGLSurfaceView.INPUT_MODE_REAL_MOUSE;
-					context.iInputMode.setText(R.string.input_mouse);
-					if (!getBooleanPreference(context,"confjoyoverlay")) {
-						DBMain.nativeSetOption(DBMenuSystem.DOSBOX_OPTION_ID_JOYSTICK_ENABLE, 0 ,null, true);
-					}
-				break;
-				case INPUT_REAL_JOYSTICK:
-					context.mSurfaceView.mInputMode = DBGLSurfaceView.INPUT_MODE_JOYSTICK;
-					context.iInputMode.setText(R.string.input_joystick);
-					DBMain.nativeSetOption(DBMenuSystem.DOSBOX_OPTION_ID_JOYSTICK_ENABLE, 1 ,null, true);
-				break;
-				case INPUT_SCROLL:
-					context.mSurfaceView.mInputMode = DBGLSurfaceView.INPUT_MODE_SCROLL;
-					context.iInputMode.setText(R.string.input_scroll);
-					if (!getBooleanPreference(context,"confjoyoverlay")) {
-						DBMain.nativeSetOption(DBMenuSystem.DOSBOX_OPTION_ID_JOYSTICK_ENABLE, 0 ,null, true);
-					}
-				break;
-				}
-			}
-			break;
-		}
-		return true;
-	}	
-		
 	public static void getData(DBMain context, String pid) {
 		try {
 			 InputStream is = context.getContentResolver().openInputStream(Uri.parse(CONTENT_URI + pid + ".xml"));

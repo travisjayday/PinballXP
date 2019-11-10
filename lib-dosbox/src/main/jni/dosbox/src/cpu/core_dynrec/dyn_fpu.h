@@ -42,16 +42,18 @@ static void FPU_FNSTCW(PhysPt addr){
 }
 
 static void FPU_FFREE(Bitu st) {
+
 	fpu.tags[st]=TAG_Empty;
 }
-
 
 #if C_FPU_X86
 #include "fpu_instructions_x86.h"
 #elif HAVE_NEON
 #include "fpu_instructions_neon.h"
+
 #else
 #include "fpu_instructions.h"
+//int HAVE_NEON_not_activated___neon_not_included[-1];
 #endif
 
 

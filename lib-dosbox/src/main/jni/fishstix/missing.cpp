@@ -206,7 +206,7 @@ extern DECLSPEC const char * SDLCALL SDL_JoystickName(int index){return "Joystic
 //extern DECLSPEC void SDLCALL SDL_JoystickUpdate(void) {}
 extern DECLSPEC int SDLCALL SDL_JoystickEventState(int state){return 0;}
 
-extern DECLSPEC char * SDLCALL SDL_GetKeyName(SDLKey key){return (char *)("Key " + key);}
+//extern DECLSPEC char * SDLCALL SDL_GetKeyName(SDLKey key){return (char *)("Key " + key);}
 
 
 bool autofire = false;
@@ -221,14 +221,14 @@ void MAPPER_RunInternal(){}
 
 extern DECLSPEC int SDLCALL SDL_Flip(SDL_Surface* screen) {return 0;}
 
-extern DECLSPEC SDL_GrabMode SDLCALL SDL_WM_GrabInput(SDL_GrabMode mode) {return SDL_GRAB_ON;}
+//extern DECLSPEC SDL_GrabMode SDLCALL SDL_WM_GrabInput(SDL_GrabMode mode) {return SDL_GRAB_ON;}
 extern DECLSPEC int SDLCALL SDL_ShowCursor(int toggle){return SDL_ENABLE;}
 extern DECLSPEC void SDLCALL SDL_WM_SetCaption(const char *title, const char *icon){}
 
 extern DECLSPEC int SDLCALL SDL_CDNumDrives(){return 0;}
 extern DECLSPEC const char * SDLCALL SDL_CDName(int drive){return "CDROM " + drive;}
 
-extern DECLSPEC char * SDLCALL SDL_GetError(void){return (char *)"";}
+//extern DECLSPEC char * SDLCALL SDL_GetError(void){return (char *)"";}
 
 extern DECLSPEC void SDLCALL SDL_PauseAudio(int pause_on){}
 extern DECLSPEC void SDLCALL SDL_LockAudio(void){}
