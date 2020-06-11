@@ -1,19 +1,2 @@
-# DosBox library
-
-## Build
-
- 1. Make sure you have installed [JDK 8][2]
- 2. One time use command
-
-	`gradlew ndkInstall`
-
- 3. Build command
-
-	`gradlew ndkBuild build`
-
- 4. Clean command
-
-    `gradlew ndkClean clean`
-
- [1]: https://developer.android.com/ndk/downloads/index.html
- [2]: http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html
+# Space Cadet ported to Android through DosBox
+This app was published but then taken down because of copyright reasons. I've open-sourced the code for others to use. Build with Android Studio and NDK. See GooglePlay folder for screenshots. Sorry for the short README. Please open an issue if you need help compiling the code.
